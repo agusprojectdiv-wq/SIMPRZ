@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
@@ -269,7 +272,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">Password</label>
                     <input type="password" id="loginPassword" required class="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="••••••••">
                 </div>
-                <button type="submit" class="w-full bg-orange-accent hover:bg-orange-600 text-white font-bold py-2.5 rounded-lg transition shadow-md hover:shadow-lg text-sm">
+                <button type="submit" id="loginSubmitBtn" class="w-full bg-orange-accent hover:bg-orange-600 text-white font-bold py-2.5 rounded-lg transition shadow-md hover:shadow-lg text-sm">
                     Masuk ke System
                 </button>
             </form>
@@ -277,6 +280,9 @@
             <div class="mt-6 pt-4 border-t border-gray-100 text-center">
                 <p class="text-[11px] text-gray-400 font-medium">Akun Demo (Admin Utama: <code class="text-gray-700">adminutama</code> / <code class="text-gray-700">beasiswa_123</code>)</p>
                 <p class="text-[11px] text-gray-400 font-medium mt-1">Advisor Demo: <code class="text-gray-700">Wahyudin_</code> / <code class="text-gray-700">Wahyu_123</code></p>
+                <button type="button" onclick="setupSeedAccounts()" class="text-[10.5px] text-gray-400 hover:text-orange-accent underline mt-2">
+                    Setup Akun Awal ke Firebase (jalankan sekali saja)
+                </button>
             </div>
         </div>
     </div>
@@ -1161,8 +1167,42 @@
     <script>
         let currentUser = null;
         let currentUploadTarget = { projId: null, type: null };
+        let currentTabId = 'dashboard';
 
-        // Data Inisialisasi
+        // ===================================================
+        // FIREBASE INIT (Firestore = data real-time lintas perangkat,
+        // Firebase Authentication = sistem login)
+        // ===================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBz7ykyV3OLnf1wl2gMTNgITgHwEBLEkPs",
+            authDomain: "simp-511a4.firebaseapp.com",
+            projectId: "simp-511a4",
+            storageBucket: "simp-511a4.firebasestorage.app",
+            messagingSenderId: "638035539856",
+            appId: "1:638035539856:web:494b3bfd0045c7c770a515",
+            measurementId: "G-72YLY7ZNBC"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        // App kedua khusus untuk membuat akun (Admin/Advisor/PIC) dari sisi client TANPA
+        // menggantikan sesi login admin yang sedang aktif (Firebase otomatis sign-in ke
+        // akun yang baru dibuat kalau dibuat lewat instance auth utama).
+        const secondaryApp = firebase.initializeApp(firebaseConfig, 'Secondary');
+        const secondaryAuth = secondaryApp.auth();
+
+        // Firebase Authentication butuh format email; username yang dipakai di UI
+        // (adminutama, Wahyudin_, dst / Nama PIC) diubah jadi email sintetis + dipakai juga
+        // sebagai ID dokumen profil di Firestore koleksi 'users'.
+        function usernameToDocId(username) {
+            return (username || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'user';
+        }
+        function usernameToEmail(username) {
+            return `${usernameToDocId(username)}@simp-app.local`;
+        }
+
+        // Data Inisialisasi (fallback offline dari localStorage; sumber utama tetap Firestore
+        // via listener real-time di startProjectsRealtimeSync())
         let projects = JSON.parse(localStorage.getItem('rz_projects')) || [
             {
                 id: 'PROJ-001',
@@ -1191,63 +1231,165 @@
             }
         ];
 
-        const ACCOUNTS = {
-            'adminutama': { name: 'Admin Utama', pass: 'beasiswa_123', isMainAdmin: true },
-            'Wahyudin_': { name: 'Wahyudin', pass: 'Wahyu_123', isMainAdmin: false },
-            'Maskur_': { name: 'Maskur', pass: 'Maskur_123', isMainAdmin: false },
-            'Ruby_': { name: 'Ruby', pass: 'Ruby_123', isMainAdmin: false },
-            'Dea_': { name: 'Dea', pass: 'Dea_123', isMainAdmin: false },
-            'Amar_': { name: 'Amar', pass: 'Amar_123', isMainAdmin: false }
-        };
+        // Akun login awal (Admin Utama + 5 Advisor). Dibuat di Firebase Authentication SEKALI
+        // lewat tombol "Setup Akun Awal" di modal login (lihat setupSeedAccounts()).
+        const SEED_ACCOUNTS = [
+            { username: 'adminutama', name: 'Admin Utama', pass: 'beasiswa_123', isMainAdmin: true },
+            { username: 'Wahyudin_', name: 'Wahyudin', pass: 'Wahyu_123', isMainAdmin: false },
+            { username: 'Maskur_', name: 'Maskur', pass: 'Maskur_123', isMainAdmin: false },
+            { username: 'Ruby_', name: 'Ruby', pass: 'Ruby_123', isMainAdmin: false },
+            { username: 'Dea_', name: 'Dea', pass: 'Dea_123', isMainAdmin: false },
+            { username: 'Amar_', name: 'Amar', pass: 'Amar_123', isMainAdmin: false }
+        ];
 
-        // Akun PIC dibuat otomatis saat data project disimpan: username = Nama PIC,
-        // password = No. Mipro. Role 'pic' hanya bisa akses menu Laporan Bulanan
-        // untuk project-project di mana namanya tercatat sebagai PIC.
-        let picAccounts = JSON.parse(localStorage.getItem('rz_pic_accounts')) || {};
-
-        function savePicAccounts() {
-            localStorage.setItem('rz_pic_accounts', JSON.stringify(picAccounts));
+        // Jalankan SEKALI SAJA (tombol di modal login) untuk membuat akun Admin Utama +
+        // 5 Advisor di Firebase Authentication & profil rolenya di Firestore koleksi 'users'.
+        // Aman dijalankan berkali-kali -- akun yang sudah ada otomatis dilewati.
+        async function setupSeedAccounts() {
+            if (!confirm('Proses ini membuat akun login awal (Admin Utama + 5 Advisor) di Firebase. Jalankan hanya SEKALI saja (aman diulang, akun yang sudah ada akan dilewati). Lanjutkan?')) return;
+            let created = 0, skipped = 0, failed = 0;
+            for (const acc of SEED_ACCOUNTS) {
+                const email = usernameToEmail(acc.username);
+                const docId = usernameToDocId(acc.username);
+                try {
+                    await secondaryAuth.createUserWithEmailAndPassword(email, acc.pass);
+                    await db.collection('users').doc(docId).set({
+                        username: acc.username, name: acc.name,
+                        role: acc.isMainAdmin ? 'admin' : 'advisor', isMainAdmin: acc.isMainAdmin
+                    });
+                    created++;
+                } catch (err) {
+                    if (err.code === 'auth/email-already-in-use') {
+                        await db.collection('users').doc(docId).set({
+                            username: acc.username, name: acc.name,
+                            role: acc.isMainAdmin ? 'admin' : 'advisor', isMainAdmin: acc.isMainAdmin
+                        }, { merge: true });
+                        skipped++;
+                    } else {
+                        console.error('Gagal membuat akun', acc.username, err);
+                        failed++;
+                    }
+                } finally {
+                    await secondaryAuth.signOut().catch(() => {});
+                }
+            }
+            alert(`Setup akun awal selesai.\nDibuat baru: ${created}\nSudah ada sebelumnya: ${skipped}\nGagal: ${failed}`);
         }
 
-        // Membuat/memperbarui akun login PIC berdasarkan No. Mipro & Nama PIC project.
-        function upsertPicAccount(noMipro, picName) {
+        // Membuat/memperbarui akun login PIC (username = Nama PIC, password = No. Mipro) di
+        // Firebase Authentication + profil role-nya di Firestore. Role 'pic' hanya bisa akses
+        // menu Laporan Bulanan untuk project di mana namanya tercatat sebagai PIC.
+        // CATATAN KETERBATASAN: kalau No. Mipro sebuah project diubah setelah akun PIC-nya
+        // pernah dibuat, password lama TETAP berlaku (client SDK tidak bisa mengganti password
+        // akun lain tanpa login sebagai akun itu sendiri / tanpa Firebase Admin SDK di server).
+        async function upsertPicAccount(noMipro, picName) {
             if (!noMipro || !picName) return;
             const username = picName.trim();
             if (!username) return;
-            picAccounts[username] = { name: username, pass: noMipro.trim(), role: 'pic' };
-            savePicAccounts();
+            const email = usernameToEmail(username);
+            const docId = usernameToDocId(username);
+            const profile = { username, name: username, role: 'pic', isMainAdmin: false };
+
+            try {
+                await secondaryAuth.createUserWithEmailAndPassword(email, noMipro.trim());
+                await db.collection('users').doc(docId).set(profile);
+            } catch (err) {
+                if (err.code === 'auth/email-already-in-use') {
+                    await db.collection('users').doc(docId).set(profile, { merge: true });
+                } else {
+                    console.error('Gagal membuat akun PIC:', err);
+                }
+            } finally {
+                await secondaryAuth.signOut().catch(() => {});
+            }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
+        // Sinkronisasi real-time: setiap perubahan di Firestore (dari perangkat manapun)
+        // langsung tercermin di sini tanpa perlu refresh halaman.
+        let unsubscribeProjects = null;
+        function startProjectsRealtimeSync() {
+            if (unsubscribeProjects) return;
+            unsubscribeProjects = db.collection('projects').onSnapshot(snapshot => {
+                const remote = [];
+                snapshot.forEach(doc => remote.push(doc.data()));
+                projects = remote;
+                localStorage.setItem('rz_projects', JSON.stringify(projects));
+                refreshCurrentView();
+            }, error => {
+                console.error('Firestore realtime sync error:', error);
+            });
+        }
+
+        // Hindari me-refresh tampilan saat user sedang mengisi form (modal / halaman penuh
+        // Input Laporan Bulanan / form Tambah-Edit Project) supaya isian yang belum
+        // tersimpan tidak hilang ketika ada update real-time dari perangkat lain.
+        function isEditingSurfaceOpen() {
+            const modalIds = ['actionModal', 'onsiteModal', 'monitoringModal'];
+            if (modalIds.some(id => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); })) return true;
+            const lbPage = document.getElementById('view-laporan-bulanan-input');
+            if (lbPage && !lbPage.classList.contains('hidden')) return true;
+            const projForm = document.getElementById('projectFormContainer');
+            if (projForm && !projForm.classList.contains('hidden')) return true;
+            return false;
+        }
+
+        function refreshCurrentView() {
+            if (isEditingSurfaceOpen()) return;
+            switchTab(currentTabId || 'dashboard');
+        }
+
+        // Pulihkan sesi login dari Firebase Auth (persist otomatis lintas reload) dan ambil
+        // profil role dari Firestore.
+        auth.onAuthStateChanged(async (user) => {
+            if (user && user.email) {
+                const docId = user.email.split('@')[0];
+                try {
+                    const snap = await db.collection('users').doc(docId).get();
+                    if (snap.exists) {
+                        currentUser = { uid: user.uid, ...snap.data() };
+                    } else {
+                        currentUser = null;
+                    }
+                } catch (err) {
+                    console.error('Gagal memuat profil user:', err);
+                    currentUser = null;
+                }
+            } else {
+                currentUser = null;
+            }
             initApp();
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            startProjectsRealtimeSync();
         });
 
         function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
         function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); }
 
-        function handleLogin(e) {
+        async function handleLogin(e) {
             e.preventDefault();
             const u = document.getElementById('loginUsername').value.trim();
             const p = document.getElementById('loginPassword').value.trim();
             const err = document.getElementById('loginError');
+            const submitBtn = document.getElementById('loginSubmitBtn');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerText = 'Memproses...'; }
 
-            if (ACCOUNTS[u] && ACCOUNTS[u].pass === p) {
-                currentUser = { username: u, role: ACCOUNTS[u].isMainAdmin ? 'admin' : 'advisor', ...ACCOUNTS[u] };
+            try {
+                await auth.signInWithEmailAndPassword(usernameToEmail(u), p);
+                // currentUser & initApp() akan otomatis di-set oleh listener onAuthStateChanged
                 err.classList.add('hidden');
                 closeLoginModal();
-                initApp();
-            } else if (picAccounts[u] && picAccounts[u].pass === p) {
-                currentUser = { username: u, isMainAdmin: false, ...picAccounts[u] };
-                err.classList.add('hidden');
-                closeLoginModal();
-                initApp();
-            } else {
+            } catch (error) {
                 err.innerText = 'Username atau password salah!';
                 err.classList.remove('hidden');
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = 'Login'; }
             }
         }
 
         function logout() {
+            auth.signOut().catch(err => console.error('Gagal logout:', err));
             currentUser = null;
             initApp();
         }
@@ -1259,8 +1401,8 @@
                 document.getElementById('userDisplayName').innerText = currentUser.name;
                 document.getElementById('userRoleBadge').innerText = currentUser.isMainAdmin ? 'Admin Utama' : (currentUser.role === 'pic' ? 'PIC Project' : 'Advisor');
                 document.getElementById('userAvatar').innerText = currentUser.name.substring(0, 2).toUpperCase();
-                document.getElementById('activeAdvisorName').innerText = currentUser.isMainAdmin ? 'Semua Advisor (Admin Utama)' : currentUser.name;
-                document.getElementById('dashLoginScope').innerText = currentUser.isMainAdmin ? 'Semua Data' : `Data ${currentUser.name}`;
+                document.getElementById('activeAdvisorName').innerText = currentUser.role === 'pic' ? `${currentUser.name} (PIC Project)` : (currentUser.isMainAdmin ? 'Semua Advisor (Admin Utama)' : `${currentUser.name} (Advisor, akses Tim)`);
+                document.getElementById('dashLoginScope').innerText = currentUser.role === 'pic' ? `Data Project ${currentUser.name}` : 'Semua Data (Tim)';
                 document.getElementById('headerLoginBtn').innerHTML = `<i class="fa-solid fa-right-from-bracket mr-1.5"></i> Logout (${currentUser.name})`;
                 document.getElementById('headerLoginBtn').onclick = logout;
                 document.getElementById('addProjectBtn').classList.toggle('hidden', currentUser.role === 'pic');
@@ -1295,8 +1437,10 @@
         function getFilteredProjects() {
             if (!currentUser) return projects;
             if (currentUser.role === 'pic') return projects.filter(p => p.pic === currentUser.name);
-            if (currentUser.isMainAdmin) return projects;
-            return projects.filter(p => p.advisor === currentUser.name);
+            // Admin Utama maupun semua akun Advisor lain sama-sama melihat SEMUA data project
+            // (data bersifat kolaboratif satu tim). Field 'advisor' hanya sebagai atribusi/PIC
+            // penanggung jawab, bukan filter akses/visibilitas.
+            return projects;
         }
 
         function toggleProjectForm(show = true) {
@@ -1355,6 +1499,7 @@
             if (currentUser && currentUser.role === 'pic' && !PIC_ALLOWED_TABS.includes(tabId)) {
                 tabId = 'laporan-bulanan';
             }
+            currentTabId = tabId;
             document.querySelectorAll('nav a').forEach(a => a.classList.remove('sidebar-active'));
             const activeNav = document.getElementById(`nav-${tabId}`);
             if (activeNav) activeNav.classList.add('sidebar-active');
@@ -1409,7 +1554,7 @@
         }
 
         // CRUD Project
-        function handleSaveProject(e) {
+        async function handleSaveProject(e) {
             e.preventDefault();
             if (!currentUser) return;
 
@@ -1444,9 +1589,9 @@
             }
 
             // Otomatis buat/perbarui akun login PIC: username = Nama PIC, password = No. Mipro
-            upsertPicAccount(noMipro, pic);
+            await upsertPicAccount(noMipro, pic);
 
-            saveAndSync();
+            await saveAndSync();
             toggleProjectForm(false);
             renderMasterProjectTable();
             alert(`Data Project berhasil disimpan!\n\nAkun login PIC otomatis dibuat/diperbarui:\nUsername: ${pic}\nPassword: ${noMipro}\n(Akses terbatas ke menu Laporan Bulanan)`);
@@ -1483,7 +1628,8 @@
 
             if (confirm(`Apakah Anda yakin ingin menghapus project "${p.nama}" (${p.noMipro})?`)) {
                 projects = projects.filter(item => item.id !== id);
-                saveAndSync();
+                localStorage.setItem('rz_projects', JSON.stringify(projects));
+                db.collection('projects').doc(id).delete().catch(err => console.error('Gagal menghapus di server:', err));
                 renderMasterProjectTable();
                 alert('Project berhasil dihapus!');
             }
@@ -1495,8 +1641,20 @@
             document.getElementById('formProjectTitle').innerHTML = '<i class="fa-solid fa-plus-circle text-orange-accent mr-2"></i>Tambah Project Baru';
         }
 
-        function saveAndSync() {
+        // Simpan ke localStorage (cache offline) sekaligus sinkron real-time ke Firestore
+        // supaya data langsung terbaca dari perangkat manapun.
+        async function saveAndSync() {
             localStorage.setItem('rz_projects', JSON.stringify(projects));
+            try {
+                const batch = db.batch();
+                projects.forEach(p => {
+                    batch.set(db.collection('projects').doc(p.id), p);
+                });
+                await batch.commit();
+            } catch (err) {
+                console.error('Gagal sinkron ke Firestore:', err);
+                alert('Gagal menyimpan ke server (periksa koneksi internet). Perubahan untuk sementara hanya tersimpan di perangkat ini.');
+            }
         }
 
         // REVISI 1: RENDER MASTER TABLE DENGAN TOMBOL HAPUS DI SAMPLING EDIT
