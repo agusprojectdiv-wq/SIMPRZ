@@ -1190,6 +1190,11 @@
         // akun yang baru dibuat kalau dibuat lewat instance auth utama).
         const secondaryApp = firebase.initializeApp(firebaseConfig, 'Secondary');
         const secondaryAuth = secondaryApp.auth();
+        // Firestore client TERIKAT ke app kedua -- dipakai khusus untuk menulis profil user
+        // supaya penulisan tsb membawa sesi login akun yang BARU dibuat (bukan sesi kosong/
+        // sesi admin utama), karena Firestore rules mengevaluasi request.auth berdasarkan
+        // instance app yang benar-benar melakukan request.
+        const secondaryDb = secondaryApp.firestore();
 
         // Firebase Authentication butuh format email; username yang dipakai di UI
         // (adminutama, Wahyudin_, dst / Nama PIC) diubah jadi email sintetis + dipakai juga
@@ -1234,7 +1239,7 @@
         // Akun login awal (Admin Utama + 5 Advisor). Dibuat di Firebase Authentication SEKALI
         // lewat tombol "Setup Akun Awal" di modal login (lihat setupSeedAccounts()).
         const SEED_ACCOUNTS = [
-            { username: 'adminutama', name: 'Admin Utama', pass: 'adminutama_123', isMainAdmin: true },
+            { username: 'adminutama', name: 'Admin Utama', pass: 'beasiswa_123', isMainAdmin: true },
             { username: 'Wahyudin_', name: 'Wahyudin', pass: 'Wahyu_123', isMainAdmin: false },
             { username: 'Maskur_', name: 'Maskur', pass: 'Maskur_123', isMainAdmin: false },
             { username: 'Ruby_', name: 'Ruby', pass: 'Ruby_123', isMainAdmin: false },
@@ -1253,17 +1258,23 @@
                 const docId = usernameToDocId(acc.username);
                 try {
                     await secondaryAuth.createUserWithEmailAndPassword(email, acc.pass);
-                    await db.collection('users').doc(docId).set({
+                    // Tulis lewat secondaryDb -- saat ini secondaryAuth SEDANG terautentikasi
+                    // sebagai akun yang baru dibuat, jadi request ini punya request.auth != null.
+                    await secondaryDb.collection('users').doc(docId).set({
                         username: acc.username, name: acc.name,
                         role: acc.isMainAdmin ? 'admin' : 'advisor', isMainAdmin: acc.isMainAdmin
                     });
                     created++;
                 } catch (err) {
                     if (err.code === 'auth/email-already-in-use') {
+                        // Akun Auth sudah ada sebelumnya (mis. dibuat manual lewat Console) --
+                        // di sini TIDAK ada sesi login manapun yang valid utk akun tsb, jadi
+                        // penulisan profil ini butuh Firestore rule 'users' yang mengizinkan
+                        // write terbuka (allow write: if true;), lihat catatan di chat.
                         await db.collection('users').doc(docId).set({
                             username: acc.username, name: acc.name,
                             role: acc.isMainAdmin ? 'admin' : 'advisor', isMainAdmin: acc.isMainAdmin
-                        }, { merge: true });
+                        }, { merge: true }).catch(profErr => console.error('Gagal menulis profil (cek Firestore rules utk koleksi users):', profErr));
                         skipped++;
                     } else {
                         console.error('Gagal membuat akun', acc.username, err);
@@ -1292,10 +1303,14 @@
 
             try {
                 await secondaryAuth.createUserWithEmailAndPassword(email, noMipro.trim());
-                await db.collection('users').doc(docId).set(profile);
+                // Tulis lewat secondaryDb -- secondaryAuth sedang terautentikasi sbg akun baru ini.
+                await secondaryDb.collection('users').doc(docId).set(profile);
             } catch (err) {
                 if (err.code === 'auth/email-already-in-use') {
-                    await db.collection('users').doc(docId).set(profile, { merge: true });
+                    // Akun PIC ini sudah pernah dibuat -- update metadata saja (butuh Firestore
+                    // rule 'users' yang mengizinkan write terbuka, lihat catatan di chat).
+                    await db.collection('users').doc(docId).set(profile, { merge: true })
+                        .catch(profErr => console.error('Gagal update profil PIC (cek Firestore rules utk koleksi users):', profErr));
                 } else {
                     console.error('Gagal membuat akun PIC:', err);
                 }
