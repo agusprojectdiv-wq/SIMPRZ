@@ -14,12 +14,59 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Montserrat', sans-serif; background-color: #f3f4f6; }
         .sidebar { background-color: #0c1a30; }
         .sidebar-active { background-color: #f97316; color: white !important; font-weight: 600; }
         .bg-orange-accent { background-color: #f97316; }
         .text-orange-accent { color: #f97316; }
         .border-orange-accent { border-color: #f97316; }
+
+        /* Item 9: sentuhan tampilan supaya lebih berwarna namun tetap rapi/profesional */
+        .dash-stat-card { transition: box-shadow .2s ease, transform .2s ease; }
+        .dash-stat-card:hover { box-shadow: 0 10px 22px -10px rgba(15,23,42,0.18); transform: translateY(-1px); }
+        .sidebar { background: linear-gradient(180deg, #0c1a30 0%, #16273f 100%); }
+        header.bg-white { background: linear-gradient(90deg, #ffffff 0%, #fffaf5 100%); }
+        .bg-white.rounded-xl.border.border-gray-200.shadow-sm { transition: box-shadow .2s ease; }
+        .bg-white.rounded-xl.border.border-gray-200.shadow-sm:hover { box-shadow: 0 8px 20px -12px rgba(15,23,42,0.15); }
+
+        /* Item 3 & 5: garis vertikal tipis antar kolom, padding cukup supaya tidak
+           berdempet, dan header tabel bertinta oranye tipis -- berlaku untuk semua tabel
+           data utama di seluruh menu (tabel form kustom seperti .lb-table / .input-table /
+           form onsite & monitoring TIDAK terkena, karena sudah punya gaya sendiri). */
+        .module-view table:not(.lb-table),
+        #view-dashboard table,
+        #view-input-project table,
+        #view-raport-project table {
+            border-collapse: collapse;
+        }
+        .module-view table:not(.lb-table) thead th,
+        #view-dashboard table thead th,
+        #view-input-project table thead th,
+        #view-raport-project table thead th {
+            background-color: #fff7ed;
+            padding: 10px 16px !important;
+            border-right: 1px solid #fed7aa;
+            border-bottom: 1px solid #fed7aa !important;
+        }
+        .module-view table:not(.lb-table) thead th:last-child,
+        #view-dashboard table thead th:last-child,
+        #view-input-project table thead th:last-child,
+        #view-raport-project table thead th:last-child {
+            border-right: none;
+        }
+        .module-view table:not(.lb-table) tbody td,
+        #view-dashboard table tbody td,
+        #view-input-project table tbody td,
+        #view-raport-project table tbody td {
+            padding: 10px 16px !important;
+            border-right: 1px solid #f3ede6;
+        }
+        .module-view table:not(.lb-table) tbody td:last-child,
+        #view-dashboard table tbody td:last-child,
+        #view-input-project table tbody td:last-child,
+        #view-raport-project table tbody td:last-child {
+            border-right: none;
+        }
 
         /* Tabel & tombol untuk halaman penuh Input Laporan Bulanan */
         .lb-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -248,6 +295,12 @@
 </head>
 <body class="flex min-h-screen text-gray-800">
 
+    <!-- BANNER STATUS SINKRONISASI FIREBASE (tersembunyi kecuali ada info/error) -->
+    <div id="syncStatusBanner" class="hidden fixed top-0 inset-x-0 z-[100] px-4 py-2.5 text-xs font-semibold flex items-center justify-between gap-3">
+        <span id="syncStatusText" class="flex items-center gap-2"></span>
+        <button onclick="document.getElementById('syncStatusBanner').classList.add('hidden')" class="text-current opacity-70 hover:opacity-100 flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
     <!-- LOGIN MODAL -->
     <div id="loginModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 border border-gray-100 relative">
@@ -300,7 +353,7 @@
                     </div>
                     <div>
                         <h1 class="font-bold text-lg leading-tight">Rumah Zakat</h1>
-                        <span class="text-xs text-gray-400 font-semibold tracking-wider block">SIMP</span>
+                        <span class="text-xs text-gray-400 font-semibold tracking-wider block">PROJECT MANAGEMENT</span>
                     </div>
                 </div>
 
@@ -382,9 +435,9 @@
                 </div>
                 
                 <div class="flex items-center space-x-3">
-                    <div id="advisorStatusBadge" class="bg-gray-100 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2">
-                        <i class="fa-solid fa-globe"></i>
-                        <span>Status: <strong id="activeAdvisorName">Akses Publik (Read-Only)</strong></span>
+                    <div id="advisorStatusBadge" class="bg-orange-50 border border-orange-200 text-orange-800 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2">
+                        <div class="w-6 h-6 rounded-full bg-orange-accent text-white flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-user text-[10px]"></i></div>
+                        <span class="leading-tight">Login sebagai<br><strong id="activeAdvisorName" class="text-[13px]">Akses Publik (Read-Only)</strong></span>
                     </div>
                     <button id="headerLoginBtn" onclick="openLoginModal()" class="bg-orange-accent hover:bg-orange-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition flex items-center shadow-xs">
                         <i class="fa-solid fa-lock mr-1.5"></i> Login Admin / Advisor
@@ -397,33 +450,47 @@
 
                 <!-- 1. DASHBOARD VIEW -->
                 <div id="view-dashboard" class="space-y-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center space-x-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div class="dash-stat-card bg-white p-4 rounded-xl border border-gray-200 border-t-4 border-t-orange-400 shadow-sm flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 flex-shrink-0"><i class="fa-solid fa-folder-open text-lg"></i></div>
                             <div>
                                 <p class="text-[11px] font-semibold text-gray-400 uppercase">Total Project</p>
                                 <h3 class="text-xl font-bold text-gray-900" id="dashTotalProjects">0</h3>
                             </div>
                         </div>
-                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center space-x-3">
+                        <div class="dash-stat-card bg-white p-4 rounded-xl border border-gray-200 border-t-4 border-t-sky-400 shadow-sm flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600 flex-shrink-0"><i class="fa-solid fa-spinner text-lg"></i></div>
+                            <div>
+                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Project Running</p>
+                                <h3 class="text-xl font-bold text-gray-900" id="dashProjectRunning">0</h3>
+                            </div>
+                        </div>
+                        <div class="dash-stat-card bg-white p-4 rounded-xl border border-gray-200 border-t-4 border-t-emerald-400 shadow-sm flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0"><i class="fa-solid fa-circle-check text-lg"></i></div>
+                            <div>
+                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Project Finish</p>
+                                <h3 class="text-xl font-bold text-gray-900" id="dashProjectFinish">0</h3>
+                            </div>
+                        </div>
+                        <div class="dash-stat-card bg-white p-4 rounded-xl border border-gray-200 border-t-4 border-t-green-400 shadow-sm flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0"><i class="fa-solid fa-sack-dollar text-lg"></i></div>
                             <div>
                                 <p class="text-[11px] font-semibold text-gray-400 uppercase">Total Nilai Project</p>
                                 <h3 class="text-xl font-bold text-gray-900" id="dashTotalValue">Rp 0</h3>
                             </div>
                         </div>
-                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0"><i class="fa-solid fa-chart-line text-lg"></i></div>
+                        <div class="dash-stat-card bg-white p-4 rounded-xl border border-gray-200 border-t-4 border-t-blue-400 shadow-sm flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0"><i class="fa-solid fa-users text-lg"></i></div>
                             <div>
-                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Resume Prestasi MONEV</p>
-                                <h3 class="text-xl font-bold text-gray-900" id="dashAvgPerformance">0%</h3>
+                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Jumlah Peserta Program</p>
+                                <h3 class="text-xl font-bold text-gray-900" id="dashTotalPeserta">0</h3>
                             </div>
                         </div>
-                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0"><i class="fa-solid fa-user-shield text-lg"></i></div>
+                        <div class="dash-stat-card bg-white p-4 rounded-xl border border-gray-200 border-t-4 border-t-purple-400 shadow-sm flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0"><i class="fa-solid fa-bullseye text-lg"></i></div>
                             <div>
-                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Akses Mode</p>
-                                <h3 class="text-sm font-bold text-gray-900" id="dashLoginScope">Mode Publik</h3>
+                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Ketercapaian KPI</p>
+                                <h3 class="text-xl font-bold text-gray-900" id="dashKpiAchievement">0%</h3>
                             </div>
                         </div>
                     </div>
@@ -448,7 +515,7 @@
                                 <table class="w-full text-left text-[11px]">
                                     <thead>
                                         <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
-                                            <th class="pb-2">No. Mipro</th><th class="pb-2">Nama Project</th><th class="pb-2">PIC</th><th class="pb-2">Berakhir</th>
+                                            <th class="pb-2">No. Mipro</th><th class="pb-2">Nama Project</th><th class="pb-2">Nama Donatur</th><th class="pb-2">Berakhir</th>
                                         </tr>
                                     </thead>
                                     <tbody id="dashEndThisMonthBody" class="divide-y divide-gray-100"></tbody>
@@ -461,7 +528,7 @@
                                 <table class="w-full text-left text-[11px]">
                                     <thead>
                                         <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
-                                            <th class="pb-2">No. Mipro</th><th class="pb-2">Nama Project</th><th class="pb-2">PIC</th><th class="pb-2">Berakhir</th>
+                                            <th class="pb-2">No. Mipro</th><th class="pb-2">Nama Project</th><th class="pb-2">Nama Donatur</th><th class="pb-2">Berakhir</th>
                                         </tr>
                                     </thead>
                                     <tbody id="dashEndNextMonthBody" class="divide-y divide-gray-100"></tbody>
@@ -661,20 +728,20 @@
                             </button>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs">
+                            <table class="w-full text-left text-xs" style="table-layout: fixed;">
                                 <thead>
                                     <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
-                                        <th class="pb-3">No. Mipro</th>
-                                        <th class="pb-3">Nama Project</th>
-                                        <th class="pb-3">Advisor</th>
-                                        <th class="pb-3 text-center">Pra Impl.</th>
-                                        <th class="pb-3 text-center">Risiko</th>
-                                        <th class="pb-3 text-center">Stakeholder</th>
-                                        <th class="pb-3 text-center">Bulanan</th>
-                                        <th class="pb-3 text-center">Monitoring</th>
-                                        <th class="pb-3 text-center">Onsite</th>
-                                        <th class="pb-3 text-center">Partisipatori</th>
-                                        <th class="pb-3 text-right">Progress Project</th>
+                                        <th class="pb-3" style="width:11%;">No. Mipro</th>
+                                        <th class="pb-3" style="width:16%;">Nama Project</th>
+                                        <th class="pb-3" style="width:9%;">Advisor</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Pra Impl.</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Risiko</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:8%;">Stakeholder</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Bulanan</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:8%;">Monitoring</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Onsite</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:8%;">Partisipatori</th>
+                                        <th class="pb-3 text-right whitespace-normal align-bottom" style="width:12%;">Progress Project</th>
                                     </tr>
                                 </thead>
                                 <tbody id="raportTableBody" class="divide-y divide-gray-100 font-medium"></tbody>
@@ -1319,19 +1386,41 @@
             }
         }
 
+        // Banner status sinkronisasi -- supaya kalau ada masalah koneksi/izin ke Firebase,
+        // langsung kelihatan di layar (bukan cuma di console) dan gampang dilaporkan.
+        function showSyncStatus(message, type = 'info') {
+            const banner = document.getElementById('syncStatusBanner');
+            const text = document.getElementById('syncStatusText');
+            const styles = {
+                info: 'bg-blue-50 text-blue-700 border-b border-blue-200',
+                error: 'bg-red-50 text-red-700 border-b border-red-200',
+                success: 'bg-green-50 text-green-700 border-b border-green-200'
+            };
+            const icons = { info: 'fa-circle-notch fa-spin', error: 'fa-triangle-exclamation', success: 'fa-circle-check' };
+            banner.className = `fixed top-0 inset-x-0 z-[100] px-4 py-2.5 text-xs font-semibold flex items-center justify-between gap-3 ${styles[type]}`;
+            text.innerHTML = `<i class="fa-solid ${icons[type]}"></i> ${message}`;
+            banner.classList.remove('hidden');
+        }
+        function hideSyncStatus() {
+            document.getElementById('syncStatusBanner').classList.add('hidden');
+        }
+
         // Sinkronisasi real-time: setiap perubahan di Firestore (dari perangkat manapun)
         // langsung tercermin di sini tanpa perlu refresh halaman.
         let unsubscribeProjects = null;
         function startProjectsRealtimeSync() {
             if (unsubscribeProjects) return;
+            showSyncStatus('Menyambungkan ke database...', 'info');
             unsubscribeProjects = db.collection('projects').onSnapshot(snapshot => {
                 const remote = [];
                 snapshot.forEach(doc => remote.push(doc.data()));
                 projects = remote;
                 localStorage.setItem('rz_projects', JSON.stringify(projects));
+                hideSyncStatus();
                 refreshCurrentView();
             }, error => {
                 console.error('Firestore realtime sync error:', error);
+                showSyncStatus(`Gagal memuat data dari server (${error.code || error.message}). Data yang tampil hanya dari cache perangkat ini -- cek Firestore Rules koleksi 'projects'.`, 'error');
             });
         }
 
@@ -1353,21 +1442,36 @@
             switchTab(currentTabId || 'dashboard');
         }
 
+        // Cari dokumen profil user di Firestore koleksi 'users'. Coba dulu lewat ID dokumen
+        // langsung (cara normal); kalau tidak ketemu, coba lagi lewat query field 'username'
+        // sebagai jaring pengaman (mis. akun yang pernah dibuat manual dengan id berbeda).
+        async function findUserProfile(docId) {
+            const directSnap = await db.collection('users').doc(docId).get();
+            if (directSnap.exists) return directSnap.data();
+
+            const querySnap = await db.collection('users').where('username', '==', docId).limit(1).get();
+            if (!querySnap.empty) return querySnap.docs[0].data();
+
+            return null;
+        }
+
         // Pulihkan sesi login dari Firebase Auth (persist otomatis lintas reload) dan ambil
         // profil role dari Firestore.
         auth.onAuthStateChanged(async (user) => {
             if (user && user.email) {
                 const docId = user.email.split('@')[0];
                 try {
-                    const snap = await db.collection('users').doc(docId).get();
-                    if (snap.exists) {
-                        currentUser = { uid: user.uid, ...snap.data() };
+                    const profile = await findUserProfile(docId);
+                    if (profile) {
+                        currentUser = { uid: user.uid, ...profile };
                     } else {
                         currentUser = null;
+                        showSyncStatus(`Login berhasil di Firebase, tapi profil/role untuk akun ini belum ada di Firestore (koleksi 'users', id: "${docId}"). Klik "Setup Akun Awal ke Firebase" di modal login, atau cek dokumen users/${docId} di Firestore Console.`, 'error');
                     }
                 } catch (err) {
                     console.error('Gagal memuat profil user:', err);
                     currentUser = null;
+                    showSyncStatus(`Gagal membaca profil user dari Firestore: ${err.code || err.message}. Kemungkinan Firestore Rules belum mengizinkan baca koleksi 'users'.`, 'error');
                 }
             } else {
                 currentUser = null;
@@ -1416,8 +1520,7 @@
                 document.getElementById('userDisplayName').innerText = currentUser.name;
                 document.getElementById('userRoleBadge').innerText = currentUser.isMainAdmin ? 'Admin Utama' : (currentUser.role === 'pic' ? 'PIC Project' : 'Advisor');
                 document.getElementById('userAvatar').innerText = currentUser.name.substring(0, 2).toUpperCase();
-                document.getElementById('activeAdvisorName').innerText = currentUser.role === 'pic' ? `${currentUser.name} (PIC Project)` : (currentUser.isMainAdmin ? 'Semua Advisor (Admin Utama)' : `${currentUser.name} (Advisor, akses Tim)`);
-                document.getElementById('dashLoginScope').innerText = currentUser.role === 'pic' ? `Data Project ${currentUser.name}` : 'Semua Data (Tim)';
+                document.getElementById('activeAdvisorName').innerText = currentUser.role === 'pic' ? `${currentUser.name} (PIC Project)` : (currentUser.isMainAdmin ? 'Semua Advisor (Admin Utama)' : `${currentUser.name} (Advisor)`);
                 document.getElementById('headerLoginBtn').innerHTML = `<i class="fa-solid fa-right-from-bracket mr-1.5"></i> Logout (${currentUser.name})`;
                 document.getElementById('headerLoginBtn').onclick = logout;
                 document.getElementById('addProjectBtn').classList.toggle('hidden', currentUser.role === 'pic');
@@ -1426,7 +1529,6 @@
                 document.getElementById('userRoleBadge').innerText = 'Mode Publik (Read-Only)';
                 document.getElementById('userAvatar').innerHTML = '<i class="fa-solid fa-eye"></i>';
                 document.getElementById('activeAdvisorName').innerText = 'Akses Publik (Read-Only)';
-                document.getElementById('dashLoginScope').innerText = 'Mode Publik';
                 document.getElementById('headerLoginBtn').innerHTML = `<i class="fa-solid fa-lock mr-1.5"></i> Login Admin / Advisor`;
                 document.getElementById('headerLoginBtn').onclick = openLoginModal;
                 document.getElementById('addProjectBtn').classList.add('hidden');
@@ -1452,20 +1554,20 @@
         function getFilteredProjects() {
             if (!currentUser) return projects;
             if (currentUser.role === 'pic') return projects.filter(p => p.pic === currentUser.name);
-            // Admin Utama maupun semua akun Advisor lain sama-sama melihat SEMUA data project
-            // (data bersifat kolaboratif satu tim). Field 'advisor' hanya sebagai atribusi/PIC
-            // penanggung jawab, bukan filter akses/visibilitas.
-            return projects;
+            if (currentUser.isMainAdmin) return projects;
+            // Advisor selain Admin Utama hanya melihat project yang dia input sendiri
+            // (field 'advisor' pada project cocok dengan nama akun yang sedang login).
+            return projects.filter(p => p.advisor === currentUser.name);
         }
 
         function toggleProjectForm(show = true) {
-            if (!currentUser) {
-                alert('Silakan login terlebih dahulu untuk mengelola data!');
-                openLoginModal();
-                return;
-            }
             const container = document.getElementById('projectFormContainer');
             if (show) {
+                if (!currentUser) {
+                    alert('Silakan login terlebih dahulu untuk mengelola data!');
+                    openLoginModal();
+                    return;
+                }
                 populateLokasiSuggestions();
                 container.classList.remove('hidden');
             } else {
@@ -1685,9 +1787,9 @@
 
             data.forEach(p => {
                 const actionCell = currentUser 
-                    ? `<div class="flex items-center justify-center space-x-2">
-                        <button onclick="editProject('${p.id}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded text-xs transition inline-flex items-center"><i class="fa-solid fa-pen mr-1"></i> Edit</button>
-                        <button onclick="deleteProject('${p.id}')" class="bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1 rounded text-xs transition inline-flex items-center"><i class="fa-solid fa-trash mr-1"></i> Hapus</button>
+                    ? `<div class="flex items-center justify-center space-x-1.5">
+                        <button onclick="editProject('${p.id}')" title="Edit" class="w-7 h-7 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded transition text-xs"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteProject('${p.id}')" title="Hapus" class="w-7 h-7 flex items-center justify-center bg-red-600 hover:bg-red-700 text-white rounded transition text-xs"><i class="fa-solid fa-trash"></i></button>
                        </div>`
                     : `<span class="text-gray-400 italic text-[11px]">Read-Only</span>`;
 
@@ -1711,15 +1813,19 @@
         }
 
         function renderDashboard() {
-            const allData = projects;
+            const allData = getFilteredProjects();
             document.getElementById('dashTotalProjects').innerText = allData.length;
             const totalVal = allData.reduce((acc, p) => acc + (p.nilai || 0), 0);
             document.getElementById('dashTotalValue').innerText = `Rp ${totalVal.toLocaleString('id-ID')}`;
 
-            let totalPercent = 0;
-            allData.forEach(p => { totalPercent += calculateProjectProgress(p); });
-            const avg = allData.length > 0 ? Math.round(totalPercent / allData.length) : 0;
-            document.getElementById('dashAvgPerformance').innerText = `${avg}%`;
+            const runningCount = allData.filter(p => getProjectStatus(p) === 'Running').length;
+            const finishCount = allData.filter(p => getProjectStatus(p) === 'Finish').length;
+            document.getElementById('dashProjectRunning').innerText = runningCount;
+            document.getElementById('dashProjectFinish').innerText = finishCount;
+
+            const kpiSummary = computeKpiSummary(allData);
+            document.getElementById('dashTotalPeserta').innerText = kpiSummary.totalPeserta.toLocaleString('id-ID');
+            document.getElementById('dashKpiAchievement').innerText = `${kpiSummary.avgAchievement}%`;
 
             renderDashboardStatusPie(allData);
             renderDashboardMonthBar(allData);
@@ -1749,28 +1855,61 @@
             });
         }
 
-        // Status project ditentukan dari tanggal Periode Selesai dibanding hari ini:
-        // - belum lewat tanggal selesai (atau tanggal selesai belum diisi) -> Running
-        // - sudah lewat, tapi kelengkapan modul MONEV masih rendah (<80%)   -> Delay
-        // - sudah lewat & kelengkapan modul tinggi (>=80%)                  -> Finish
+        // Resume Jumlah Peserta Program & Persentase Ketercapaian KPI, dihitung dari isian
+        // tabel Indikator KPI di modul Laporan Monitoring tiap project.
+        // - Jumlah Peserta Program: dijumlah dari baris KPI yang realisasinya berupa jumlah
+        //   orang/peserta (dikenali dari kata kunci di nama metrik/satuan).
+        // - Ketercapaian KPI: rata-rata (realisasi/target) dari semua baris KPI bernilai
+        //   angka, dibatasi maksimal 100% per baris supaya tidak bias oleh capaian ekstrem.
+        function computeKpiSummary(data) {
+            let totalPeserta = 0;
+            let achievementSum = 0, achievementCount = 0;
+            const pesertaKeywords = /(peserta|penerima|jiwa|orang|keluarga|\bkk\b|siswa|jamaah|anggota)/i;
+
+            data.forEach(p => {
+                const kpis = (p.monitoring && Array.isArray(p.monitoring.kpis)) ? p.monitoring.kpis : [];
+                kpis.forEach(k => {
+                    const target = parseFloat(k.target);
+                    const realisasi = parseFloat(k.realisasi);
+                    const label = `${k.metrik || ''} ${k.satuan || ''}`;
+                    if (!isNaN(realisasi) && pesertaKeywords.test(label)) {
+                        totalPeserta += realisasi;
+                    }
+                    if (!isNaN(target) && target > 0 && !isNaN(realisasi)) {
+                        achievementSum += Math.min((realisasi / target) * 100, 100);
+                        achievementCount++;
+                    }
+                });
+            });
+
+            return {
+                totalPeserta,
+                avgAchievement: achievementCount > 0 ? Math.round(achievementSum / achievementCount) : 0
+            };
+        }
+
+        // Status project: Finish jika BULAN periode selesai project sudah lewat dari bulan
+        // berjalan saat ini; selain itu (belum diisi, bulan sekarang, atau masih di masa
+        // depan) dianggap Running.
         function getProjectStatus(p) {
             if (!p.periodeSelesai) return 'Running';
-            const today = new Date(); today.setHours(0, 0, 0, 0);
             const end = new Date(p.periodeSelesai + 'T00:00:00');
-            if (isNaN(end) || today <= end) return 'Running';
-            return calculateProjectProgress(p) >= 80 ? 'Finish' : 'Delay';
+            if (isNaN(end)) return 'Running';
+            const now = new Date();
+            const endMonthIndex = end.getFullYear() * 12 + end.getMonth();
+            const nowMonthIndex = now.getFullYear() * 12 + now.getMonth();
+            return endMonthIndex < nowMonthIndex ? 'Finish' : 'Running';
         }
 
         function renderDashboardStatusPie(data) {
             const wrap = document.getElementById('dashStatusPieWrap');
             if (!wrap) return;
-            const counts = { Running: 0, Finish: 0, Delay: 0 };
+            const counts = { Running: 0, Finish: 0 };
             data.forEach(p => { counts[getProjectStatus(p)]++; });
             const total = data.length;
             const segments = [
-                { label: 'Running', val: counts.Running, color: '#3b82f6' },
-                { label: 'Finish', val: counts.Finish, color: '#22c55e' },
-                { label: 'Delay', val: counts.Delay, color: '#ef4444' }
+                { label: 'Running', val: counts.Running, color: '#0ea5e9' },
+                { label: 'Finish', val: counts.Finish, color: '#22c55e' }
             ];
             if (total === 0) {
                 wrap.innerHTML = `<div class="text-xs text-gray-400 italic py-6 px-2">Belum ada data project</div>`;
@@ -1857,8 +1996,15 @@
                 return !isNaN(d) && d.getMonth() === nextMonth && d.getFullYear() === nextMonthYear;
             });
 
+            const bulanNamaID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            function formatBulanTahun(dateStr) {
+                const d = new Date(dateStr + 'T00:00:00');
+                if (isNaN(d)) return '-';
+                return `${bulanNamaID[d.getMonth()]} ${d.getFullYear()}`;
+            }
+
             const buildRows = (list) => list.length
-                ? list.map(p => `<tr><td class="py-2 font-bold">${p.noMipro}</td><td class="py-2">${p.nama}</td><td class="py-2">${p.pic || '-'}</td><td class="py-2 text-orange-600 font-semibold">${formatTanggalPendekID(p.periodeSelesai)}</td></tr>`).join('')
+                ? list.map(p => `<tr><td class="py-2 font-bold">${p.noMipro}</td><td class="py-2">${p.nama}</td><td class="py-2">${p.donatur || '-'}</td><td class="py-2 text-orange-600 font-semibold">${formatBulanTahun(p.periodeSelesai)}</td></tr>`).join('')
                 : `<tr><td colspan="4" class="py-3 text-center text-gray-400 italic">Tidak ada project berakhir pada periode ini</td></tr>`;
 
             document.getElementById('dashEndThisMonthBody').innerHTML = buildRows(endThisMonth);
@@ -1898,22 +2044,22 @@
                     let actionButtonsHtml = '';
                     if (isSaved) {
                         actionButtonsHtml += `
-                            <button onclick="printPDFDetail('${p.id}', '${cfg.key}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs transition inline-flex items-center mr-1">
-                                <i class="fa-solid fa-file-pdf mr-1"></i>Detail (PDF)
+                            <button onclick="printPDFDetail('${p.id}', '${cfg.key}')" title="Detail (PDF)" class="w-7 h-7 inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs transition mr-1">
+                                <i class="fa-solid fa-file-pdf"></i>
                             </button>
                         `;
                         if (currentUser) {
                             actionButtonsHtml += `
-                                <button onclick="${cfg.fn}('${p.id}' ${cfg.param ? ',' + extraArg : ''})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs transition inline-flex items-center">
-                                    <i class="fa-solid fa-pen-to-square mr-1"></i>Edit
+                                <button onclick="${cfg.fn}('${p.id}' ${cfg.param ? ',' + extraArg : ''})" title="Edit" class="w-7 h-7 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs transition">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                             `;
                         }
                     } else {
                         if (currentUser) {
                             actionButtonsHtml = `
-                                <button onclick="${cfg.fn}('${p.id}' ${cfg.param ? ',' + extraArg : ''})" class="bg-orange-accent hover:bg-orange-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition inline-flex items-center">
-                                    <i class="fa-solid ${cfg.icon} mr-1.5"></i>${cfg.label}
+                                <button onclick="${cfg.fn}('${p.id}' ${cfg.param ? ',' + extraArg : ''})" title="${cfg.label}" class="w-7 h-7 inline-flex items-center justify-center bg-orange-accent hover:bg-orange-600 text-white rounded-lg text-xs transition">
+                                    <i class="fa-solid ${cfg.icon}"></i>
                                 </button>
                             `;
                         } else {
@@ -3771,7 +3917,7 @@
 
         // REVISI 7: RAPORT PROJECT (Satu Tampilan untuk Semua Access, Resume Progress & Ranking)
         function renderRaportProject() {
-            const data = projects;
+            const data = getFilteredProjects();
             const tbody = document.getElementById('raportTableBody');
             const rankTbody = document.getElementById('advisorRankingTableBody');
             tbody.innerHTML = '';
