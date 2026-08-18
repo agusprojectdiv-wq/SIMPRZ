@@ -489,21 +489,55 @@
                         <div class="dash-stat-card bg-white p-4 rounded-xl border border-gray-200 border-t-4 border-t-purple-400 shadow-sm flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0"><i class="fa-solid fa-bullseye text-lg"></i></div>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Ketercapaian KPI</p>
+                                <p class="text-[11px] font-semibold text-gray-400 uppercase">Capaian KPI</p>
                                 <h3 class="text-xl font-bold text-gray-900 break-words" id="dashKpiAchievement">0%</h3>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Grafik ringkas: status project & jumlah project per bulan implementasi (dibuat kecil, berdampingan) -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Grafik ringkas: status project, jumlah project per bulan, & per provinsi (dibuat kecil, berdampingan) -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                            <h4 class="text-xs font-bold text-gray-900 mb-2">Status Project (Running / Finish / Delay)</h4>
+                            <h4 class="text-xs font-bold text-gray-900 mb-2">Status Project (Running / Finish)</h4>
                             <div id="dashStatusPieWrap" class="flex items-center gap-4"></div>
                         </div>
                         <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                            <h4 class="text-xs font-bold text-gray-900 mb-2">Jumlah Project per Bulan (Awal Implementasi)</h4>
+                            <h4 class="text-xs font-bold text-gray-900 mb-2">Jumlah Project per Bulan (5 Bulan Terakhir)</h4>
                             <div id="dashMonthBarWrap"></div>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-gray-900 mb-2">Jumlah Project per Provinsi</h4>
+                            <div id="dashProvinceBarWrap"></div>
+                        </div>
+                    </div>
+
+                    <!-- Rekap jumlah project per Monev & Top 5 project berdasarkan anggaran -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-gray-900 mb-3"><i class="fa-solid fa-user-tie text-orange-accent mr-1.5"></i>Jumlah Project per Monev</h4>
+                            <div class="overflow-x-auto overflow-y-auto" style="max-height: 300px;">
+                                <table class="w-full text-left text-[11px]">
+                                    <thead class="sticky top-0 z-10">
+                                        <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
+                                            <th class="pb-2">Nama Monev</th><th class="pb-2 text-center">Total Project</th><th class="pb-2 text-center">Running</th><th class="pb-2 text-center">Finish</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dashMonevTableBody" class="divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-gray-900 mb-3"><i class="fa-solid fa-ranking-star text-orange-accent mr-1.5"></i>Top 5 Project Berdasarkan Anggaran <span class="text-gray-400 font-normal">(project running)</span></h4>
+                            <div class="overflow-x-auto overflow-y-auto" style="max-height: 300px;">
+                                <table class="w-full text-left text-[11px]">
+                                    <thead class="sticky top-0 z-10">
+                                        <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
+                                            <th class="pb-2">Nama Project</th><th class="pb-2">Nama Donatur</th><th class="pb-2 text-right">Jumlah Anggaran</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dashTopBudgetTableBody" class="divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
@@ -538,10 +572,13 @@
                     </div>
 
                     <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <h4 class="text-sm font-bold text-gray-900 mb-4">Ringkasan Rekapan Project Terdaftar</h4>
-                        <div class="overflow-x-auto">
+                        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                            <h4 class="text-sm font-bold text-gray-900">Rekap Project Running <span class="text-gray-400 font-normal text-xs">(urut nilai project)</span></h4>
+                            <input type="text" id="dashRunningSearch" oninput="renderDashRunningTable()" placeholder="Cari di tabel ini..." class="text-xs border border-gray-300 rounded-lg px-3 py-1.5 w-52 focus:ring-1 focus:ring-orange-500">
+                        </div>
+                        <div class="overflow-x-auto overflow-y-auto" style="max-height: 900px;">
                             <table class="w-full text-left text-xs">
-                                <thead>
+                                <thead class="sticky top-0 z-10">
                                     <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
                                         <th class="pb-3">No. Mipro</th>
                                         <th class="pb-3">Nama Project</th>
@@ -551,7 +588,29 @@
                                         <th class="pb-3 text-right">Kelengkapan Modul</th>
                                     </tr>
                                 </thead>
-                                <tbody id="dashboardTableBody" class="divide-y divide-gray-100 font-medium"></tbody>
+                                <tbody id="dashRunningTableBody" class="divide-y divide-gray-100 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                            <h4 class="text-sm font-bold text-gray-900">Rekap Project Finish <span class="text-gray-400 font-normal text-xs">(urut nilai project)</span></h4>
+                            <input type="text" id="dashFinishSearch" oninput="renderDashFinishTable()" placeholder="Cari di tabel ini..." class="text-xs border border-gray-300 rounded-lg px-3 py-1.5 w-52 focus:ring-1 focus:ring-orange-500">
+                        </div>
+                        <div class="overflow-x-auto overflow-y-auto" style="max-height: 900px;">
+                            <table class="w-full text-left text-xs">
+                                <thead class="sticky top-0 z-10">
+                                    <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
+                                        <th class="pb-3">No. Mipro</th>
+                                        <th class="pb-3">Nama Project</th>
+                                        <th class="pb-3">Donatur</th>
+                                        <th class="pb-3">Nilai Project</th>
+                                        <th class="pb-3">Advisor / Monev</th>
+                                        <th class="pb-3 text-right">Kelengkapan Modul</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashFinishTableBody" class="divide-y divide-gray-100 font-medium"></tbody>
                             </table>
                         </div>
                     </div>
@@ -1839,30 +1898,147 @@
 
             renderDashboardStatusPie(allData);
             renderDashboardMonthBar(allData);
+            renderDashboardProvinceBar(allData);
+            renderDashboardMonevTable(allData);
+            renderDashboardTopBudgetTable(allData);
             renderDashboardEndingTables(allData);
 
-            const tbody = document.getElementById('dashboardTableBody');
-            tbody.innerHTML = '';
-            if (allData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-400">Belum ada data</td></tr>`;
+            dashRunningDataCache = allData.filter(p => getProjectStatus(p) === 'Running').sort((a, b) => (b.nilai || 0) - (a.nilai || 0));
+            dashFinishDataCache = allData.filter(p => getProjectStatus(p) === 'Finish').sort((a, b) => (b.nilai || 0) - (a.nilai || 0));
+            renderDashRunningTable();
+            renderDashFinishTable();
+        }
+
+        function buildDashProjectRow(p) {
+            const prog = calculateProjectProgress(p);
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="py-3 font-bold">${p.noMipro}</td>
+                    <td class="py-3 font-bold text-gray-900">${p.nama}</td>
+                    <td class="py-3">${p.donatur}</td>
+                    <td class="py-3">Rp ${(p.nilai || 0).toLocaleString('id-ID')}</td>
+                    <td class="py-3"><span class="bg-orange-50 text-orange-700 font-bold px-2 py-0.5 rounded">${p.advisor}</span></td>
+                    <td class="py-3 text-right">
+                        <span class="font-bold text-xs ${prog === 100 ? 'text-green-600' : 'text-orange-600'}">${prog}% Modul Terisi</span>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function filterProjectsBySearch(list, term) {
+            if (!term || !term.trim()) return list;
+            const t = term.trim().toLowerCase();
+            return list.filter(p =>
+                (p.noMipro || '').toLowerCase().includes(t) ||
+                (p.nama || '').toLowerCase().includes(t) ||
+                (p.donatur || '').toLowerCase().includes(t) ||
+                (p.advisor || '').toLowerCase().includes(t)
+            );
+        }
+
+        // Cache hasil filter Running/Finish (di-set ulang tiap renderDashboard()), dipakai
+        // oleh kotak pencarian masing-masing tabel supaya tidak perlu filter ulang dari awal.
+        let dashRunningDataCache = [];
+        let dashFinishDataCache = [];
+
+        function renderDashRunningTable() {
+            const term = document.getElementById('dashRunningSearch')?.value || '';
+            const filtered = filterProjectsBySearch(dashRunningDataCache, term);
+            const tbody = document.getElementById('dashRunningTableBody');
+            tbody.innerHTML = filtered.length ? filtered.map(buildDashProjectRow).join('') : `<tr><td colspan="6" class="text-center py-4 text-gray-400">Tidak ada data</td></tr>`;
+        }
+
+        function renderDashFinishTable() {
+            const term = document.getElementById('dashFinishSearch')?.value || '';
+            const filtered = filterProjectsBySearch(dashFinishDataCache, term);
+            const tbody = document.getElementById('dashFinishTableBody');
+            tbody.innerHTML = filtered.length ? filtered.map(buildDashProjectRow).join('') : `<tr><td colspan="6" class="text-center py-4 text-gray-400">Tidak ada data</td></tr>`;
+        }
+
+        // Rekap jumlah project ditangani tiap Monev (advisor), diurutkan dari jumlah project
+        // terbanyak.
+        function renderDashboardMonevTable(data) {
+            const tbody = document.getElementById('dashMonevTableBody');
+            if (!tbody) return;
+            const counter = {};
+            data.forEach(p => {
+                const name = p.advisor || 'Tidak diketahui';
+                if (!counter[name]) counter[name] = { total: 0, running: 0, finish: 0 };
+                counter[name].total++;
+                if (getProjectStatus(p) === 'Running') counter[name].running++; else counter[name].finish++;
+            });
+            const sorted = Object.entries(counter).sort((a, b) => b[1].total - a[1].total);
+            tbody.innerHTML = sorted.length ? sorted.map(([name, c]) => `
+                <tr>
+                    <td class="py-2 font-semibold">${name}</td>
+                    <td class="py-2 text-center">${c.total}</td>
+                    <td class="py-2 text-center text-sky-600 font-bold">${c.running}</td>
+                    <td class="py-2 text-center text-emerald-600 font-bold">${c.finish}</td>
+                </tr>
+            `).join('') : `<tr><td colspan="4" class="text-center py-4 text-gray-400">Tidak ada data</td></tr>`;
+        }
+
+        // Top 5 project (yang masih Running) dengan anggaran terbesar.
+        function renderDashboardTopBudgetTable(data) {
+            const tbody = document.getElementById('dashTopBudgetTableBody');
+            if (!tbody) return;
+            const top5 = data.filter(p => getProjectStatus(p) === 'Running')
+                .sort((a, b) => (b.nilai || 0) - (a.nilai || 0))
+                .slice(0, 5);
+            tbody.innerHTML = top5.length ? top5.map(p => `
+                <tr>
+                    <td class="py-2 font-semibold">${p.nama}</td>
+                    <td class="py-2">${p.donatur}</td>
+                    <td class="py-2 text-right font-bold text-green-700">Rp ${(p.nilai || 0).toLocaleString('id-ID')}</td>
+                </tr>
+            `).join('') : `<tr><td colspan="3" class="text-center py-4 text-gray-400">Tidak ada data project running</td></tr>`;
+        }
+
+        // Daftar provinsi Indonesia dipakai untuk mencocokkan teks Lokasi Implementasi
+        // (yang formatnya bebas / hasil reverse-geocode GPS) ke nama provinsi.
+        const INDONESIA_PROVINCES = [
+            'Aceh', 'Sumatera Utara', 'Sumatera Barat', 'Riau', 'Kepulauan Riau', 'Jambi', 'Sumatera Selatan',
+            'Kepulauan Bangka Belitung', 'Bangka Belitung', 'Bengkulu', 'Lampung', 'DKI Jakarta', 'Jakarta',
+            'Jawa Barat', 'Jawa Tengah', 'DI Yogyakarta', 'Daerah Istimewa Yogyakarta', 'Yogyakarta', 'Jawa Timur',
+            'Banten', 'Bali', 'Nusa Tenggara Barat', 'Nusa Tenggara Timur', 'Kalimantan Barat', 'Kalimantan Tengah',
+            'Kalimantan Selatan', 'Kalimantan Timur', 'Kalimantan Utara', 'Sulawesi Utara', 'Sulawesi Tengah',
+            'Sulawesi Selatan', 'Sulawesi Tenggara', 'Gorontalo', 'Sulawesi Barat', 'Maluku Utara', 'Maluku',
+            'Papua Barat Daya', 'Papua Barat', 'Papua Tengah', 'Papua Pegunungan', 'Papua Selatan', 'Papua'
+        ];
+        function extractProvinsi(lokasiText) {
+            if (!lokasiText) return 'Tidak diketahui';
+            const text = lokasiText.toLowerCase();
+            for (const prov of INDONESIA_PROVINCES) {
+                if (text.includes(prov.toLowerCase())) return prov;
+            }
+            return 'Lainnya';
+        }
+
+        function renderDashboardProvinceBar(data) {
+            const wrap = document.getElementById('dashProvinceBarWrap');
+            if (!wrap) return;
+            const withLoc = data.filter(p => p.lokasiImplementasi);
+            if (withLoc.length === 0) {
+                wrap.innerHTML = `<div class="text-xs text-gray-400 italic py-6 px-2">Belum ada data lokasi project</div>`;
                 return;
             }
-
-            allData.forEach(p => {
-                const prog = calculateProjectProgress(p);
-                tbody.innerHTML += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="py-3 font-bold">${p.noMipro}</td>
-                        <td class="py-3 font-bold text-gray-900">${p.nama}</td>
-                        <td class="py-3">${p.donatur}</td>
-                        <td class="py-3">Rp ${p.nilai.toLocaleString('id-ID')}</td>
-                        <td class="py-3"><span class="bg-orange-50 text-orange-700 font-bold px-2 py-0.5 rounded">${p.advisor}</span></td>
-                        <td class="py-3 text-right">
-                            <span class="font-bold text-xs ${prog === 100 ? 'text-green-600' : 'text-orange-600'}">${prog}% Modul Terisi</span>
-                        </td>
-                    </tr>
-                `;
+            const counter = {};
+            withLoc.forEach(p => {
+                const prov = extractProvinsi(p.lokasiImplementasi);
+                counter[prov] = (counter[prov] || 0) + 1;
             });
+            const sorted = Object.entries(counter).sort((a, b) => b[1] - a[1]);
+            const maxVal = Math.max(...sorted.map(s => s[1]), 1);
+            const barsHtml = sorted.map(([prov, count]) => {
+                const h = Math.round((count / maxVal) * 70) + 8;
+                return `
+                    <div class="flex flex-col items-center justify-end flex-shrink-0" style="width:40px;" title="${prov}">
+                        <span class="text-[9px] font-bold text-orange-700 mb-0.5">${count}</span>
+                        <div class="w-4 rounded-t bg-orange-accent" style="height:${h}px;"></div>
+                        <span class="text-[7.5px] text-gray-400 mt-1 text-center leading-tight" style="word-break: break-word;">${prov}</span>
+                    </div>`;
+            }).join('');
+            wrap.innerHTML = `<div class="flex items-end gap-2 overflow-x-auto pb-1" style="min-height:130px;">${barsHtml}</div>`;
         }
 
         // Resume Jumlah Peserta Program & Persentase Ketercapaian KPI, dihitung dari isian
@@ -1974,7 +2150,7 @@
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 counter[key] = (counter[key] || 0) + 1;
             });
-            const sortedKeys = Object.keys(counter).sort();
+            const sortedKeys = Object.keys(counter).sort().slice(-5);
             const maxVal = Math.max(...sortedKeys.map(k => counter[k]), 1);
             const barsHtml = sortedKeys.map(k => {
                 const [y, m] = k.split('-');
