@@ -29,6 +29,21 @@
         .bg-white.rounded-xl.border.border-gray-200.shadow-sm { transition: box-shadow .2s ease; }
         .bg-white.rounded-xl.border.border-gray-200.shadow-sm:hover { box-shadow: 0 8px 20px -12px rgba(15,23,42,0.15); }
 
+        /* Tabel Rincian Detail Isian Project (Raport Project) -- kolom sempit & fixed-layout,
+           header perlu word-break supaya kata panjang tanpa spasi (Stakeholder, Partisipatori,
+           Monitoring) benar-benar wrap, bukan melewati garis kolom. */
+        .raport-detail-table th {
+            padding: 8px 6px !important;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+        }
+        .raport-detail-table td {
+            padding: 8px 6px !important;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+
         /* Item 3 & 5: garis vertikal tipis antar kolom, padding cukup supaya tidak
            berdempet, dan header tabel bertinta oranye tipis -- berlaku untuk semua tabel
            data utama di seluruh menu (tabel form kustom seperti .lb-table / .input-table /
@@ -691,15 +706,18 @@
                     </div>
 
                     <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                             <h4 class="text-sm font-bold text-gray-900">Rekapan Master Data Project</h4>
-                            <button id="addProjectBtn" onclick="toggleProjectForm(true)" class="bg-orange-accent hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center hidden">
-                                <i class="fa-solid fa-plus mr-1.5"></i>Tambah Project Baru
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="masterProjectSearch" oninput="renderMasterProjectTable()" placeholder="Cari di tabel ini..." class="text-xs border border-gray-300 rounded-lg px-3 py-1.5 w-52 focus:ring-1 focus:ring-orange-500">
+                                <button id="addProjectBtn" onclick="toggleProjectForm(true)" class="bg-orange-accent hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center hidden">
+                                    <i class="fa-solid fa-plus mr-1.5"></i>Tambah Project Baru
+                                </button>
+                            </div>
                         </div>
-                        <div class="overflow-x-auto">
+                        <div class="overflow-x-auto overflow-y-auto" style="max-height: 900px;">
                             <table class="w-full text-left text-xs">
-                                <thead>
+                                <thead class="sticky top-0 z-10">
                                     <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
                                         <th class="pb-3" style="width:3%;">No.</th>
                                         <th class="pb-3">No. Mipro</th>
@@ -792,20 +810,20 @@
                             </button>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs" style="table-layout: fixed;">
+                            <table class="w-full text-left text-xs raport-detail-table" style="table-layout: fixed;">
                                 <thead>
                                     <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
-                                        <th class="pb-3" style="width:3%;">No.</th>
-                                        <th class="pb-3" style="width:10%;">No. Mipro</th>
-                                        <th class="pb-3" style="width:15%;">Nama Project</th>
-                                        <th class="pb-3" style="width:8%;">Advisor</th>
+                                        <th class="pb-3 whitespace-normal align-bottom" style="width:3%;">No.</th>
+                                        <th class="pb-3 whitespace-normal align-bottom" style="width:10%;">No. Mipro</th>
+                                        <th class="pb-3 whitespace-normal align-bottom" style="width:14%;">Nama Project</th>
+                                        <th class="pb-3 whitespace-normal align-bottom" style="width:8%;">Advisor</th>
                                         <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Pra Impl.</th>
                                         <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Risiko</th>
                                         <th class="pb-3 text-center whitespace-normal align-bottom" style="width:8%;">Stakeholder</th>
                                         <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Bulanan</th>
                                         <th class="pb-3 text-center whitespace-normal align-bottom" style="width:8%;">Monitoring</th>
                                         <th class="pb-3 text-center whitespace-normal align-bottom" style="width:7%;">Onsite</th>
-                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:8%;">Partisipatori</th>
+                                        <th class="pb-3 text-center whitespace-normal align-bottom" style="width:9%;">Partisipatori</th>
                                         <th class="pb-3 text-center whitespace-normal align-bottom" style="width:12%;">Progress Project</th>
                                     </tr>
                                 </thead>
@@ -1852,11 +1870,13 @@
         // REVISI 1: RENDER MASTER TABLE DENGAN TOMBOL HAPUS DI SAMPLING EDIT
         function renderMasterProjectTable() {
             const tbody = document.getElementById('masterProjectTableBody');
-            const data = getFilteredProjects();
+            let data = getFilteredProjects();
+            const searchTerm = document.getElementById('masterProjectSearch')?.value || '';
+            data = filterProjectsBySearch(data, searchTerm);
             tbody.innerHTML = '';
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-gray-400">Belum ada data project</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-gray-400">Tidak ada data project</td></tr>`;
                 return;
             }
 
@@ -2208,26 +2228,65 @@
         }
 
         // Generic Module Table Renderer
+        // actionConfig dipakai bersama oleh renderGenericModuleTable() & renderGenericModuleTableRows()
+        const GENERIC_MODULE_ACTION_CONFIG = {
+            'pra-implementasi': { label: 'Input Notula', icon: 'fa-file-signature', fn: 'openNotulaModal', key: 'notulaPra' },
+            'identifikasi-risiko': { label: 'Input Risiko', icon: 'fa-triangle-exclamation', fn: 'openRisikoModal', key: 'risiko' },
+            'identifikasi-stakeholder': { label: 'Input Stakeholder', icon: 'fa-users', fn: 'openStakeholderModal', key: 'stakeholder' },
+            'laporan-bulanan': { label: 'Input Bulanan', icon: 'fa-calendar-check', fn: 'openLaporanBulananPage', key: 'laporanBulanan' },
+            'laporan-monitoring': { label: 'Input Monitoring', icon: 'fa-magnifying-glass', fn: 'openMonitoringModal', key: 'monitoring' },
+            'laporan-onsite': { label: 'Input Onsite', icon: 'fa-location-dot', fn: 'openOnsiteModal', key: 'onsite' },
+            'meeting-partisipatori': { label: 'Input Partisipatori', icon: 'fa-comments', fn: 'openNotulaModal', param: 'partisipatori', key: 'partisipatori' },
+            'lesson-learned': { label: 'Input Lesson Learn', icon: 'fa-lightbulb', fn: 'openLessonLearnedModal', key: 'lessonLearned' }
+        };
+        // Menu yang dapat fasilitas kotak pencarian + batas tampilan 20 baris (scroll).
+        const GENERIC_MODULE_SEARCHABLE_TABS = ['pra-implementasi'];
+        let genericModuleDataCache = {};
+
         function renderGenericModuleTable(tabKey) {
             const container = document.getElementById(`view-${tabKey}`);
-            const data = getFilteredProjects();
+            genericModuleDataCache[tabKey] = getFilteredProjects();
+            const isSearchable = GENERIC_MODULE_SEARCHABLE_TABS.includes(tabKey);
 
-            const actionConfig = {
-                'pra-implementasi': { label: 'Input Notula', icon: 'fa-file-signature', fn: 'openNotulaModal', key: 'notulaPra' },
-                'identifikasi-risiko': { label: 'Input Risiko', icon: 'fa-triangle-exclamation', fn: 'openRisikoModal', key: 'risiko' },
-                'identifikasi-stakeholder': { label: 'Input Stakeholder', icon: 'fa-users', fn: 'openStakeholderModal', key: 'stakeholder' },
-                'laporan-bulanan': { label: 'Input Bulanan', icon: 'fa-calendar-check', fn: 'openLaporanBulananPage', key: 'laporanBulanan' },
-                'laporan-monitoring': { label: 'Input Monitoring', icon: 'fa-magnifying-glass', fn: 'openMonitoringModal', key: 'monitoring' },
-                'laporan-onsite': { label: 'Input Onsite', icon: 'fa-location-dot', fn: 'openOnsiteModal', key: 'onsite' },
-                'meeting-partisipatori': { label: 'Input Partisipatori', icon: 'fa-comments', fn: 'openNotulaModal', param: 'partisipatori', key: 'partisipatori' },
-                'lesson-learned': { label: 'Input Lesson Learn', icon: 'fa-lightbulb', fn: 'openLessonLearnedModal', key: 'lessonLearned' }
-            };
+            container.innerHTML = `
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                        <h4 class="text-sm font-bold text-gray-900">Rekapan Data Modul</h4>
+                        ${isSearchable ? `<input type="text" id="genericSearch_${tabKey}" oninput="renderGenericModuleTableRows('${tabKey}')" placeholder="Cari di tabel ini..." class="text-xs border border-gray-300 rounded-lg px-3 py-1.5 w-52 focus:ring-1 focus:ring-orange-500">` : ''}
+                    </div>
+                    <div class="overflow-x-auto ${isSearchable ? 'overflow-y-auto' : ''}" ${isSearchable ? 'style="max-height: 900px;"' : ''}>
+                        <table class="w-full text-left text-xs">
+                            <thead ${isSearchable ? 'class="sticky top-0 z-10"' : ''}>
+                                <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
+                                    <th class="pb-3" style="width:4%;">No.</th>
+                                    <th class="pb-3">No. Mipro</th>
+                                    <th class="pb-3">Nama Donatur</th>
+                                    <th class="pb-3">Nama Project</th>
+                                    <th class="pb-3">Nilai Project</th>
+                                    <th class="pb-3">Periode</th>
+                                    <th class="pb-3">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="genericModuleTableBody_${tabKey}" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            renderGenericModuleTableRows(tabKey);
+        }
 
-            const cfg = actionConfig[tabKey];
+        function renderGenericModuleTableRows(tabKey) {
+            const tbody = document.getElementById(`genericModuleTableBody_${tabKey}`);
+            if (!tbody) return;
+            const cfg = GENERIC_MODULE_ACTION_CONFIG[tabKey];
+
+            let data = genericModuleDataCache[tabKey] || [];
+            const searchInput = document.getElementById(`genericSearch_${tabKey}`);
+            if (searchInput) data = filterProjectsBySearch(data, searchInput.value);
 
             let rows = '';
             if (data.length === 0) {
-                rows = `<tr><td colspan="7" class="text-center py-4 text-gray-400">Belum ada data project</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center py-4 text-gray-400">${searchInput && searchInput.value.trim() ? 'Tidak ada data' : 'Belum ada data project'}</td></tr>`;
             } else {
                 data.forEach((p, idx) => {
                     const extraArg = cfg.param ? `'${cfg.param}'` : '';
@@ -2276,28 +2335,7 @@
                     `;
                 });
             }
-
-            container.innerHTML = `
-                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                    <h4 class="text-sm font-bold text-gray-900 mb-4">Rekapan Data Modul</h4>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
-                            <thead>
-                                <tr class="text-gray-400 font-bold border-b border-gray-200 uppercase">
-                                    <th class="pb-3" style="width:4%;">No.</th>
-                                    <th class="pb-3">No. Mipro</th>
-                                    <th class="pb-3">Nama Donatur</th>
-                                    <th class="pb-3">Nama Project</th>
-                                    <th class="pb-3">Nilai Project</th>
-                                    <th class="pb-3">Periode</th>
-                                    <th class="pb-3">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">${rows}</tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
+            tbody.innerHTML = rows;
         }
 
         function checkModuleSaved(p, key) {
@@ -4115,7 +4153,10 @@
 
         // REVISI 7: RAPORT PROJECT (Satu Tampilan untuk Semua Access, Resume Progress & Ranking)
         function renderRaportProject() {
-            const data = getFilteredProjects();
+            // Halaman Raport Project (termasuk Ranking Advisor) sengaja TIDAK memakai
+            // getFilteredProjects() -- ranking cuma bermakna kalau semua advisor terlihat
+            // sekaligus, jadi selalu tampilkan data project dari SEMUA advisor.
+            const data = projects;
             const tbody = document.getElementById('raportTableBody');
             const rankTbody = document.getElementById('advisorRankingTableBody');
             tbody.innerHTML = '';
