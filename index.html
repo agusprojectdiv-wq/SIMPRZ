@@ -2240,7 +2240,11 @@
             'lesson-learned': { label: 'Input Lesson Learn', icon: 'fa-lightbulb', fn: 'openLessonLearnedModal', key: 'lessonLearned' }
         };
         // Menu yang dapat fasilitas kotak pencarian + batas tampilan 20 baris (scroll).
-        const GENERIC_MODULE_SEARCHABLE_TABS = ['pra-implementasi'];
+        const GENERIC_MODULE_SEARCHABLE_TABS = [
+            'pra-implementasi', 'identifikasi-risiko', 'identifikasi-stakeholder',
+            'laporan-bulanan', 'laporan-monitoring', 'laporan-onsite',
+            'meeting-partisipatori', 'lesson-learned'
+        ];
         let genericModuleDataCache = {};
 
         function renderGenericModuleTable(tabKey) {
@@ -2340,7 +2344,12 @@
 
         function checkModuleSaved(p, key) {
             if (!p[key]) return false;
-            if (Array.isArray(p[key])) return p[key].length > 0;
+            if (Array.isArray(p[key])) {
+                if (key === 'risiko') return p[key].some(r => (r.tantangan || '').trim() || (r.dampak || '').trim() || (r.mitigasi || '').trim());
+                if (key === 'stakeholder') return p[key].some(s => (s.instansi || '').trim() || (s.peran || '').trim() || (s.jenisFollowUp || '').trim());
+                if (key === 'lessonLearned') return p[key].some(l => (l.pembelajaran || '').trim() || (l.rekomendasi || '').trim());
+                return p[key].length > 0;
+            }
             if (typeof p[key] === 'object') {
                 if (key === 'onsite') return !!(p[key].namaProject || p[key].tglMonitoring || (p[key].checklist && p[key].checklist.length));
                 if (key === 'monitoring') return !!(p[key].periodeLaporan || (p[key].activities && p[key].activities.length) || (p[key].kpis && p[key].kpis.length));
@@ -2537,12 +2546,13 @@
 
             const list = [];
             document.querySelectorAll('#risikoTableBody .risiko-row').forEach(row => {
-                list.push({
-                    tantangan: row.querySelector('.r-tantangan').value,
-                    dampak: row.querySelector('.r-dampak').value,
-                    mitigasi: row.querySelector('.r-mitigasi').value,
-                    status: row.querySelector('.r-status').value
-                });
+                const tantangan = row.querySelector('.r-tantangan').value;
+                const dampak = row.querySelector('.r-dampak').value;
+                const mitigasi = row.querySelector('.r-mitigasi').value;
+                const status = row.querySelector('.r-status').value;
+                if (tantangan.trim() || dampak.trim() || mitigasi.trim()) {
+                    list.push({ tantangan, dampak, mitigasi, status });
+                }
             });
 
             p.risiko = list;
@@ -2614,11 +2624,12 @@
 
             const list = [];
             document.querySelectorAll('#stakeholderTableBody .stk-row').forEach(row => {
-                list.push({
-                    instansi: row.querySelector('.s-instansi').value,
-                    peran: row.querySelector('.s-peran').value,
-                    jenisFollowUp: row.querySelector('.s-followup').value
-                });
+                const instansi = row.querySelector('.s-instansi').value;
+                const peran = row.querySelector('.s-peran').value;
+                const jenisFollowUp = row.querySelector('.s-followup').value;
+                if (instansi.trim() || peran.trim() || jenisFollowUp.trim()) {
+                    list.push({ instansi, peran, jenisFollowUp });
+                }
             });
 
             p.stakeholder = list;
@@ -2691,10 +2702,11 @@
 
             const list = [];
             document.querySelectorAll('#lessonTableBody .lesson-row').forEach(row => {
-                list.push({
-                    pembelajaran: row.querySelector('.l-pembelajaran').value,
-                    rekomendasi: row.querySelector('.l-rekomendasi').value
-                });
+                const pembelajaran = row.querySelector('.l-pembelajaran').value;
+                const rekomendasi = row.querySelector('.l-rekomendasi').value;
+                if (pembelajaran.trim() || rekomendasi.trim()) {
+                    list.push({ pembelajaran, rekomendasi });
+                }
             });
 
             p.lessonLearned = list;
