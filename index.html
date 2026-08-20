@@ -1790,14 +1790,16 @@
             const submitBtn = document.getElementById('projectSubmitBtn');
             if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Menyimpan...'; }
 
+            let savedProjectId = editId;
             if (editId) {
                 const index = projects.findIndex(p => p.id === editId);
                 if (index !== -1) {
                     projects[index] = { ...projects[index], noMipro, donatur, nama, nilai, periode, periodeMulai, periodeSelesai, pic, lokasiImplementasi, rumpunProgram };
                 }
             } else {
+                savedProjectId = 'PROJ-' + Date.now();
                 projects.push({
-                    id: 'PROJ-' + Date.now(),
+                    id: savedProjectId,
                     noMipro, donatur, nama, nilai, periode, periodeMulai, periodeSelesai, pic, lokasiImplementasi, rumpunProgram,
                     advisor: currentUser.name,
                     notulaPra: null, risiko: [], stakeholder: [],
@@ -1808,7 +1810,7 @@
 
             // Otomatis buat/perbarui akun login PIC: username = Nama PIC, password = No. Mipro
             await upsertPicAccount(noMipro, pic);
-            await saveAndSync();
+            await saveAndSync(savedProjectId);
 
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i>Simpan Project'; }
 
@@ -1864,14 +1866,23 @@
 
         // Simpan ke localStorage (cache offline) sekaligus sinkron real-time ke Firestore
         // supaya data langsung terbaca dari perangkat manapun.
-        async function saveAndSync() {
+        // Simpan ke localStorage (cache offline) sekaligus sinkron ke Firestore.
+        // projectId (opsional): kalau diisi, HANYA dokumen project itu yang ditulis ulang
+        // (cepat, aman dari batas ukuran batch). Kalau dikosongkan, semua project ditulis
+        // ulang -- dipakai hanya untuk kasus khusus (mis. sinkron ulang penuh).
+        async function saveAndSync(projectId) {
             localStorage.setItem('rz_projects', JSON.stringify(projects));
             try {
-                const batch = db.batch();
-                projects.forEach(p => {
-                    batch.set(db.collection('projects').doc(p.id), p);
-                });
-                await batch.commit();
+                if (projectId) {
+                    const p = projects.find(item => item.id === projectId);
+                    if (p) await db.collection('projects').doc(projectId).set(p);
+                } else {
+                    const batch = db.batch();
+                    projects.forEach(p => {
+                        batch.set(db.collection('projects').doc(p.id), p);
+                    });
+                    await batch.commit();
+                }
             } catch (err) {
                 console.error('Gagal sinkron ke Firestore:', err);
                 alert('Gagal menyimpan ke server (periksa koneksi internet). Perubahan untuk sementara hanya tersimpan di perangkat ini.');
@@ -2482,7 +2493,7 @@
                 catatan: document.getElementById('notulaCatatan').value
             };
 
-            saveAndSync();
+            saveAndSync(projId);
             closeModal();
             renderGenericModuleTable(type === 'notulaPra' ? 'pra-implementasi' : 'meeting-partisipatori');
             alert('Notula berhasil disimpan!');
@@ -2567,7 +2578,7 @@
             });
 
             p.risiko = list;
-            saveAndSync();
+            saveAndSync(projId);
             closeModal();
             renderGenericModuleTable('identifikasi-risiko');
             alert('Data Risiko berhasil disimpan!');
@@ -2644,7 +2655,7 @@
             });
 
             p.stakeholder = list;
-            saveAndSync();
+            saveAndSync(projId);
             closeModal();
             renderGenericModuleTable('identifikasi-stakeholder');
             alert('Data Management Stakeholder berhasil disimpan!');
@@ -2721,7 +2732,7 @@
             });
 
             p.lessonLearned = list;
-            saveAndSync();
+            saveAndSync(projId);
             closeModal();
             renderGenericModuleTable('lesson-learned');
             alert('Lesson Learned berhasil disimpan!');
@@ -2761,7 +2772,7 @@
                 openStakeholderModal(projId);
             }
 
-            saveAndSync();
+            saveAndSync(projId);
             alert(`File Excel "${file.name}" berhasil diunggah dan di-import!`);
             e.target.value = '';
         }
@@ -3066,7 +3077,7 @@
             lbDraft.updatedAt = new Date().toISOString();
             p.laporanBulanan = lbDraft;
 
-            saveAndSync();
+            saveAndSync(currentLBProjectId);
             renderGenericModuleTable('laporan-bulanan');
             alert('Laporan Bulanan berhasil disimpan!');
             backToLaporanBulananList();
@@ -3374,7 +3385,7 @@
             if (!p) return;
 
             p.onsite = getOnsiteFormData();
-            saveAndSync();
+            saveAndSync(currentOnsiteProjectId);
             closeOnsiteModal();
             renderGenericModuleTable('laporan-onsite');
             alert('Laporan Monitoring Onsite berhasil disimpan!');
@@ -3704,7 +3715,7 @@
             if (!p) return;
 
             p.monitoring = getMonitoringFormData();
-            saveAndSync();
+            saveAndSync(currentMonitoringProjectId);
             closeMonitoringModal();
             renderGenericModuleTable('laporan-monitoring');
             alert('Laporan Monitoring berhasil disimpan!');
