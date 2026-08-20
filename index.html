@@ -697,7 +697,7 @@
                             </div>
                             <div class="md:col-span-2 text-right pt-2 flex justify-end space-x-2">
                                 <button type="button" onclick="toggleProjectForm(false)" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-4 py-2 rounded-lg text-xs transition">Batal</button>
-                                <button type="submit" class="bg-orange-accent hover:bg-orange-600 text-white font-bold px-5 py-2 rounded-lg text-xs shadow-md transition">
+                                <button type="submit" id="projectSubmitBtn" class="bg-orange-accent hover:bg-orange-600 text-white font-bold px-5 py-2 rounded-lg text-xs shadow-md transition">
                                     <i class="fa-solid fa-floppy-disk mr-1.5"></i>Simpan Project
                                 </button>
                             </div>
@@ -1493,7 +1493,6 @@
         let unsubscribeProjects = null;
         function startProjectsRealtimeSync() {
             if (unsubscribeProjects) return;
-            showSyncStatus('Menyambungkan ke database...', 'info');
             unsubscribeProjects = db.collection('projects').onSnapshot(snapshot => {
                 const remote = [];
                 snapshot.forEach(doc => remote.push(doc.data()));
@@ -1769,6 +1768,12 @@
             if (!currentUser) return;
 
             const editId = document.getElementById('editProjectId').value;
+            const isEdit = !!editId;
+
+            if (!confirm(isEdit ? 'Yakin ingin menyimpan perubahan data project ini?' : 'Yakin ingin menyimpan data project baru ini?')) {
+                return;
+            }
+
             const noMipro = document.getElementById('projNoMipro').value;
             const donatur = document.getElementById('projDonatur').value;
             const nama = document.getElementById('projNama').value;
@@ -1781,6 +1786,9 @@
             const pic = document.getElementById('projPIC').value;
             const lokasiImplementasi = document.getElementById('projLokasi').value;
             const rumpunProgram = Array.from(document.querySelectorAll('.proj-rumpun-cb:checked')).map(cb => cb.value);
+
+            const submitBtn = document.getElementById('projectSubmitBtn');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Menyimpan...'; }
 
             if (editId) {
                 const index = projects.findIndex(p => p.id === editId);
@@ -1800,10 +1808,13 @@
 
             // Otomatis buat/perbarui akun login PIC: username = Nama PIC, password = No. Mipro
             await upsertPicAccount(noMipro, pic);
-
             await saveAndSync();
-            toggleProjectForm(false);
-            renderMasterProjectTable();
+
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i>Simpan Project'; }
+
+            // Pastikan langsung kembali ke tabel Rekapan Data Project (form ikut tertutup
+            // otomatis lewat switchTab -> toggleProjectForm(false)).
+            switchTab('input-project');
             alert(`Data Project berhasil disimpan!\n\nAkun login PIC otomatis dibuat/diperbarui:\nUsername: ${pic}\nPassword: ${noMipro}\n(Akses terbatas ke menu Laporan Bulanan)`);
         }
 
