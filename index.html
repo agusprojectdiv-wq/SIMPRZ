@@ -1335,6 +1335,11 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        // Error 'unavailable' pada Firestore web SDK umumnya bukan soal Rules, tapi transport
+        // koneksi default (WebChannel streaming) yang diblokir jaringan/proxy/extension
+        // browser tertentu. experimentalAutoDetectLongPolling otomatis beralih ke metode
+        // koneksi yang lebih kompatibel kalau itu terjadi.
+        db.settings({ experimentalAutoDetectLongPolling: true });
         // App kedua khusus untuk membuat akun (Admin/Advisor/PIC) dari sisi client TANPA
         // menggantikan sesi login admin yang sedang aktif (Firebase otomatis sign-in ke
         // akun yang baru dibuat kalau dibuat lewat instance auth utama).
@@ -1345,6 +1350,7 @@
         // sesi admin utama), karena Firestore rules mengevaluasi request.auth berdasarkan
         // instance app yang benar-benar melakukan request.
         const secondaryDb = secondaryApp.firestore();
+        secondaryDb.settings({ experimentalAutoDetectLongPolling: true });
 
         // Firebase Authentication butuh format email; username yang dipakai di UI
         // (adminutama, Wahyudin_, dst / Nama PIC) diubah jadi email sintetis + dipakai juga
@@ -1354,6 +1360,16 @@
         }
         function usernameToEmail(username) {
             return `${usernameToDocId(username)}@simp-app.local`;
+        }
+
+        // Pembatas waktu supaya operasi Firebase (login/simpan) TIDAK PERNAH menggantung
+        // selamanya kalau koneksi ke server bermasalah -- setelah batas waktu terlewati,
+        // operasi dianggap gagal dan UI diberi tahu dengan jelas alih-alih terus berputar.
+        function withTimeout(promise, ms = 12000, label = 'operasi') {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`Waktu tunggu ${label} habis (${Math.round(ms / 1000)} detik). Kemungkinan koneksi ke server Firebase terblokir/terputus.`)), ms))
+            ]);
         }
 
         // Data Inisialisasi (fallback offline dari localStorage; sumber utama tetap Firestore
@@ -1452,14 +1468,14 @@
             const profile = { username, name: username, role: 'pic', isMainAdmin: false };
 
             try {
-                await secondaryAuth.createUserWithEmailAndPassword(email, noMipro.trim());
+                await withTimeout(secondaryAuth.createUserWithEmailAndPassword(email, noMipro.trim()), 10000, 'buat akun PIC');
                 // Tulis lewat secondaryDb -- secondaryAuth sedang terautentikasi sbg akun baru ini.
-                await secondaryDb.collection('users').doc(docId).set(profile);
+                await withTimeout(secondaryDb.collection('users').doc(docId).set(profile), 10000, 'simpan profil PIC');
             } catch (err) {
                 if (err.code === 'auth/email-already-in-use') {
                     // Akun PIC ini sudah pernah dibuat -- update metadata saja (butuh Firestore
                     // rule 'users' yang mengizinkan write terbuka, lihat catatan di chat).
-                    await db.collection('users').doc(docId).set(profile, { merge: true })
+                    await withTimeout(db.collection('users').doc(docId).set(profile, { merge: true }), 10000, 'update profil PIC')
                         .catch(profErr => console.error('Gagal update profil PIC (cek Firestore rules utk koleksi users):', profErr));
                 } else {
                     console.error('Gagal membuat akun PIC:', err);
@@ -1537,13 +1553,23 @@
             return null;
         }
 
+        function describeFirestoreError(err) {
+            if (err && err.code === 'unavailable') {
+                return `Tidak bisa menyambung ke server Firebase (koneksi terputus/diblokir jaringan atau extension browser). Ini BUKAN masalah Firestore Rules. Coba muat ulang halaman, matikan sementara ad-blocker/VPN, atau coba jaringan lain.`;
+            }
+            if (err && err.code === 'permission-denied') {
+                return `Akses ditolak oleh Firestore Rules. Periksa kembali Rules untuk koleksi terkait.`;
+            }
+            return `${err && (err.code || err.message) || err}`;
+        }
+
         // Pulihkan sesi login dari Firebase Auth (persist otomatis lintas reload) dan ambil
         // profil role dari Firestore.
         auth.onAuthStateChanged(async (user) => {
             if (user && user.email) {
                 const docId = user.email.split('@')[0];
                 try {
-                    const profile = await findUserProfile(docId);
+                    const profile = await withTimeout(findUserProfile(docId), 12000, 'memuat profil akun');
                     if (profile) {
                         currentUser = { uid: user.uid, ...profile };
                     } else {
@@ -1553,7 +1579,7 @@
                 } catch (err) {
                     console.error('Gagal memuat profil user:', err);
                     currentUser = null;
-                    showSyncStatus(`Gagal membaca profil user dari Firestore: ${err.code || err.message}. Kemungkinan Firestore Rules belum mengizinkan baca koleksi 'users'.`, 'error');
+                    showSyncStatus(`Gagal membaca profil user dari Firestore. ${describeFirestoreError(err)}`, 'error');
                 }
             } else {
                 currentUser = null;
@@ -1577,12 +1603,14 @@
             if (submitBtn) { submitBtn.disabled = true; submitBtn.innerText = 'Memproses...'; }
 
             try {
-                await auth.signInWithEmailAndPassword(usernameToEmail(u), p);
+                await withTimeout(auth.signInWithEmailAndPassword(usernameToEmail(u), p), 12000, 'login');
                 // currentUser & initApp() akan otomatis di-set oleh listener onAuthStateChanged
                 err.classList.add('hidden');
                 closeLoginModal();
             } catch (error) {
-                err.innerText = 'Username atau password salah!';
+                err.innerText = (error && error.code === 'unavailable')
+                    ? 'Gagal menyambung ke server (jaringan/extension browser memblokir koneksi). Coba muat ulang halaman.'
+                    : 'Username atau password salah!';
                 err.classList.remove('hidden');
             } finally {
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = 'Login'; }
@@ -1875,17 +1903,17 @@
             try {
                 if (projectId) {
                     const p = projects.find(item => item.id === projectId);
-                    if (p) await db.collection('projects').doc(projectId).set(p);
+                    if (p) await withTimeout(db.collection('projects').doc(projectId).set(p), 12000, 'simpan data');
                 } else {
                     const batch = db.batch();
                     projects.forEach(p => {
                         batch.set(db.collection('projects').doc(p.id), p);
                     });
-                    await batch.commit();
+                    await withTimeout(batch.commit(), 20000, 'simpan data');
                 }
             } catch (err) {
                 console.error('Gagal sinkron ke Firestore:', err);
-                alert('Gagal menyimpan ke server (periksa koneksi internet). Perubahan untuk sementara hanya tersimpan di perangkat ini.');
+                alert(`Gagal menyimpan ke server: ${err.message || err.code || err}\n\nPerubahan untuk sementara hanya tersimpan di perangkat ini.`);
             }
         }
 
