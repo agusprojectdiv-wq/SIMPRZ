@@ -671,7 +671,7 @@
                             <div>
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">Nama PIC</label>
                                 <input type="text" id="projPIC" required class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-orange-500">
-                                <p class="text-[10px] text-gray-400 mt-1">Otomatis jadi <b>username</b> login PIC (password = No. Mipro), akses terbatas ke menu Laporan Bulanan.</p>
+                                <p class="text-[10px] text-gray-400 mt-1">Nama penanggung jawab (PIC) project ini.</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">Lokasi Implementasi</label>
@@ -1836,20 +1836,21 @@
                 });
             }
 
-            // Simpan data project DULU (cepat -- cuma lewat Firestore, yang sudah punya
-            // fallback long-polling). Proses akun login PIC pakai Firebase AUTHENTICATION,
-            // jalur jaringan yang terpisah dari Firestore, jadi sengaja TIDAK ditunggu
-            // (dijalankan di belakang layar) supaya lambat/macetnya proses akun PIC tidak
-            // ikut membuat simpan project ini terasa macet.
+            // Simpan data project ke Firestore.
+            // CATATAN: fitur pembuatan otomatis akun login PIC (username = Nama PIC,
+            // password = No. Mipro) SEMENTARA DINONAKTIFKAN atas permintaan -- proses itu
+            // memakai Firebase Authentication (jalur jaringan terpisah dari Firestore) dan
+            // masih menyebabkan proses simpan terasa macet di beberapa kondisi jaringan.
+            // Fungsi upsertPicAccount() masih ada di kode (tidak dihapus) untuk diaktifkan
+            // lagi nanti kalau sudah ketemu solusi yang lebih stabil.
             await saveAndSync(savedProjectId);
-            upsertPicAccount(noMipro, pic).catch(err => console.error('Gagal proses akun PIC di latar belakang:', err));
 
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i>Simpan Project'; }
 
             // Pastikan langsung kembali ke tabel Rekapan Data Project (form ikut tertutup
             // otomatis lewat switchTab -> toggleProjectForm(false)).
             switchTab('input-project');
-            alert(`Data Project berhasil disimpan!\n\nAkun login PIC otomatis dibuat/diperbarui:\nUsername: ${pic}\nPassword: ${noMipro}\n(Akses terbatas ke menu Laporan Bulanan)`);
+            alert('Data Project berhasil disimpan!');
         }
 
         function editProject(id) {
