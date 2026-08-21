@@ -1818,39 +1818,46 @@
             const submitBtn = document.getElementById('projectSubmitBtn');
             if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Menyimpan...'; }
 
-            let savedProjectId = editId;
-            if (editId) {
-                const index = projects.findIndex(p => p.id === editId);
-                if (index !== -1) {
-                    projects[index] = { ...projects[index], noMipro, donatur, nama, nilai, periode, periodeMulai, periodeSelesai, pic, lokasiImplementasi, rumpunProgram };
+            try {
+                let savedProjectId = editId;
+                if (editId) {
+                    const index = projects.findIndex(p => p.id === editId);
+                    if (index !== -1) {
+                        projects[index] = { ...projects[index], noMipro, donatur, nama, nilai, periode, periodeMulai, periodeSelesai, pic, lokasiImplementasi, rumpunProgram };
+                    }
+                } else {
+                    savedProjectId = 'PROJ-' + Date.now();
+                    projects.push({
+                        id: savedProjectId,
+                        noMipro, donatur, nama, nilai, periode, periodeMulai, periodeSelesai, pic, lokasiImplementasi, rumpunProgram,
+                        advisor: currentUser.name,
+                        notulaPra: null, risiko: [], stakeholder: [],
+                        laporanBulanan: null, monitoring: null, onsite: null,
+                        partisipatori: null, lessonLearned: []
+                    });
                 }
-            } else {
-                savedProjectId = 'PROJ-' + Date.now();
-                projects.push({
-                    id: savedProjectId,
-                    noMipro, donatur, nama, nilai, periode, periodeMulai, periodeSelesai, pic, lokasiImplementasi, rumpunProgram,
-                    advisor: currentUser.name,
-                    notulaPra: null, risiko: [], stakeholder: [],
-                    laporanBulanan: null, monitoring: null, onsite: null,
-                    partisipatori: null, lessonLearned: []
-                });
+
+                // Simpan data project ke Firestore.
+                // CATATAN: fitur pembuatan otomatis akun login PIC (username = Nama PIC,
+                // password = No. Mipro) SEMENTARA DINONAKTIFKAN atas permintaan -- proses itu
+                // memakai Firebase Authentication (jalur jaringan terpisah dari Firestore) dan
+                // masih menyebabkan proses simpan terasa macet di beberapa kondisi jaringan.
+                // Fungsi upsertPicAccount() masih ada di kode (tidak dihapus) untuk diaktifkan
+                // lagi nanti kalau sudah ketemu solusi yang lebih stabil.
+                await saveAndSync(savedProjectId);
+
+                // Pastikan langsung kembali ke tabel Rekapan Data Project (form ikut tertutup
+                // otomatis lewat switchTab -> toggleProjectForm(false)).
+                switchTab('input-project');
+                alert('Data Project berhasil disimpan!');
+            } catch (err) {
+                // Jaring pengaman terakhir: apapun yang gagal tak terduga di atas, tombol &
+                // form TIDAK BOLEH macet selamanya -- selalu beri tahu penggunanya dengan jelas.
+                console.error('Gagal menyimpan data project:', err);
+                alert(`Terjadi kesalahan saat menyimpan: ${err.message || err}\n\nSilakan coba lagi.`);
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i>Simpan Project'; }
             }
-
-            // Simpan data project ke Firestore.
-            // CATATAN: fitur pembuatan otomatis akun login PIC (username = Nama PIC,
-            // password = No. Mipro) SEMENTARA DINONAKTIFKAN atas permintaan -- proses itu
-            // memakai Firebase Authentication (jalur jaringan terpisah dari Firestore) dan
-            // masih menyebabkan proses simpan terasa macet di beberapa kondisi jaringan.
-            // Fungsi upsertPicAccount() masih ada di kode (tidak dihapus) untuk diaktifkan
-            // lagi nanti kalau sudah ketemu solusi yang lebih stabil.
-            await saveAndSync(savedProjectId);
-
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i>Simpan Project'; }
-
-            // Pastikan langsung kembali ke tabel Rekapan Data Project (form ikut tertutup
-            // otomatis lewat switchTab -> toggleProjectForm(false)).
-            switchTab('input-project');
-            alert('Data Project berhasil disimpan!');
         }
 
         function editProject(id) {
@@ -1897,14 +1904,20 @@
             document.getElementById('formProjectTitle').innerHTML = '<i class="fa-solid fa-plus-circle text-orange-accent mr-2"></i>Tambah Project Baru';
         }
 
-        // Simpan ke localStorage (cache offline) sekaligus sinkron real-time ke Firestore
-        // supaya data langsung terbaca dari perangkat manapun.
         // Simpan ke localStorage (cache offline) sekaligus sinkron ke Firestore.
         // projectId (opsional): kalau diisi, HANYA dokumen project itu yang ditulis ulang
         // (cepat, aman dari batas ukuran batch). Kalau dikosongkan, semua project ditulis
         // ulang -- dipakai hanya untuk kasus khusus (mis. sinkron ulang penuh).
         async function saveAndSync(projectId) {
-            localStorage.setItem('rz_projects', JSON.stringify(projects));
+            // Cache localStorage bersifat "nice to have" -- kalau gagal (mis. kuota
+            // localStorage penuh karena data lama hasil import berukuran besar), JANGAN
+            // sampai ini menghentikan proses simpan ke Firestore yang sebenarnya.
+            try {
+                localStorage.setItem('rz_projects', JSON.stringify(projects));
+            } catch (cacheErr) {
+                console.warn('Gagal menyimpan cache lokal (localStorage), lanjut simpan ke server saja:', cacheErr);
+            }
+
             try {
                 if (projectId) {
                     const p = projects.find(item => item.id === projectId);
