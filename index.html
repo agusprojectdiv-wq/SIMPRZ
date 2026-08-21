@@ -1836,9 +1836,13 @@
                 });
             }
 
-            // Otomatis buat/perbarui akun login PIC: username = Nama PIC, password = No. Mipro
-            await upsertPicAccount(noMipro, pic);
+            // Simpan data project DULU (cepat -- cuma lewat Firestore, yang sudah punya
+            // fallback long-polling). Proses akun login PIC pakai Firebase AUTHENTICATION,
+            // jalur jaringan yang terpisah dari Firestore, jadi sengaja TIDAK ditunggu
+            // (dijalankan di belakang layar) supaya lambat/macetnya proses akun PIC tidak
+            // ikut membuat simpan project ini terasa macet.
             await saveAndSync(savedProjectId);
+            upsertPicAccount(noMipro, pic).catch(err => console.error('Gagal proses akun PIC di latar belakang:', err));
 
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i>Simpan Project'; }
 
